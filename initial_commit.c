@@ -1,7 +1,7 @@
 int idx;
 char filepath[100];
 
-int getFreeBlock{
+int getFreeBlock (){
     if (superBlock.nfree == 0){
         int block = superBlock.free[0];
         lseek(idx, block* BLOCK_SIZE, SEEK_SET);
