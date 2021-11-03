@@ -11,44 +11,53 @@ void openfs(char* file_name) {
 }
 
 void allocateBlocks(int isize, int fsize) {
-    int allocatedBlocks = 0;
+    //int allocatedBlocks = 0;
     int unallocatedBlocks = fsize-isize;
+    int blockIdx = isize + 1;
+    int free[251];
+    int nfree;
+    int storageBlockIdx;
+    int nextStorageBlockIdx;
 
-    if (unallocatedBlocks < 100) {
-        superblock.nfree = unallocatedBlocks;
-
-        while(unallocatedBlocks > 0) {
-            superblock.nfree[allocatedBlocks] = allocatedBlocks + isize;
-            unallocatedBlocks += 1;
-            allocatedBlocks -= 1;
+    if (unallocatedBlocks < 251) {
+        int totalDataBlocks = unallocatedBlocks;
+        nfree = totalDataBlocks;
+        for (int i = 0; i < totalDataBlocks; i++) {
+            free[i] = blockIdx;
+            blockIdx += 1;
         }
+        superblock.free = free;
+        superblock.nfree = nfree;
         return;
     }
 
-    superblock.nfree = 100;
-    for (int i = 0; i < 100; i++){
-        int idx = isize + i;
-        superblock.nfree[i] = idx;
-        allocatedBlocks+=1;
-        unallocatedBlocks-=1;
+    nfree = 251;
+    for (int i = 0; i < 251; i++){
+        free[i] = blockIdx;
+        blockIdx += 1;
     }
-    int storageBlock = nfree[100];
-    while (unallocatedBlocks >= 100) {
-        for (int i = 1; i <= 100; i++){
-            int idx = isize + allocatedBlocks + i;
-            //write idx to storage block
-            unallocatedBlocks -= 1;
-            allocatedBlocks += 1;
 
+    superblock.free = free;
+    superblock.nfree = nfree;
+
+    storageBlockIdx = free[0];
+    while (blockIdx < fsize - 251) {
+        //write 251 to storage block
+        for (int i = 0; i < 251; i++) {
+            if (i == 0) {
+                nextStorageBlockIdx = blockIdx;
+            }
+            //write blockIdx to storage block
+            blockIdx += 1;
         }
-        storageBlock = isize + allocatedBlocks + 100;
+        storageBlockIdx = nextStorageBlockIdx;
     }
 
-    for (int i = 0; i < 100; i++){
-        int idx = isize + allocatedBlocks + i;
-        //write idx to storage block
-        unallocatedBlocks -= 1;
-        allocatedBlocks += 1;
+    int freeBlocks = blockIdx - fsize;
+    //write freeBlocks to storage block
+    for (blockIdx; blockIdx < fsize; blockIdx++) {
+        //write blockIdx to storage block
     }
-    return;
+
+
 }
