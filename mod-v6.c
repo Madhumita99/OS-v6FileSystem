@@ -71,26 +71,26 @@ int file_descriptor ;
 void openfs(char* file_name) {
 	file_descriptor = open(file_name, O_RDWR);		//open file given
 		
-	if (file_descriptor == -1) {					//file is not in system
+	if (file_descriptor == -1) {				//file is not in system
 		file_descriptor = open(file_name, O_CREAT);	// create file
 		printf("file created and opened\n");  
 	}
 	else {
-		printf("file opened\n");					//file found
+		printf("file opened\n");			//file found
 	}
 	return ;
 }
 
 void allocateBlocks(void) {
-	int blockIdx = superBlock.isize + 1;					//isize + superBlock
+	int blockIdx = superBlock.isize + 1;			//isize + superBlock
 	int unallocatedBlocks = superBlock.fsize - blockIdx;	//total data blocks
-	int nextFree[252] = { 0 };								//next free array
-	int nextnFree = 0;										// nfree value
+	int nextFree[252] = { 0 };				//next free array
+	int nextnFree = 0;					// nfree value
 	int storageBlockIdx = 0;
 	int nextStorageBlockIdx = 0;
 	int totalBytes = 0; 
 
-	if (unallocatedBlocks < FREE_ARRAY_SIZE) {					//number of blocks < free array size
+	if (unallocatedBlocks < FREE_ARRAY_SIZE) {		//number of blocks < free array size
 		nextnFree = unallocatedBlocks;
 		for (int i = 0; i < unallocatedBlocks; i++) {
 			blockIdx += 1;
@@ -100,7 +100,7 @@ void allocateBlocks(void) {
 		superBlock.nfree = nextnFree;
 		return;
 	}
-	else {											//number of blocks < free array size
+	else {							//number of blocks < free array size
 		nextnFree = FREE_ARRAY_SIZE;
 		//write to free array to superblock
 		for (int i = 0;  i < FREE_ARRAY_SIZE; i++) {
@@ -115,9 +115,9 @@ void allocateBlocks(void) {
 
 		while (unallocatedBlocks >= 0) {
 
-			if (unallocatedBlocks > FREE_ARRAY_SIZE) {
+			if (unallocatedBlocks > FREE_ARRAY_SIZE) {	//free blocks > 251
 				nextFree[FREE_ARRAY_SIZE] = storageBlockIdx;
-				for (int i = 1 ; i < FREE_ARRAY_SIZE; i++) {			//free blocks > 251
+				for (int i = 1 ; i < FREE_ARRAY_SIZE; i++) {			
 					blockIdx += 1;
 					if (i == 1) {
 						nextFree[i] = blockIdx;
@@ -131,7 +131,7 @@ void allocateBlocks(void) {
 					
 
 				}
-				nextFree[0] = FREE_ARRAY_SIZE;					// set new nfree value
+				nextFree[0] = FREE_ARRAY_SIZE;		// set new nfree value
 				storageBlockIdx = nextStorageBlockIdx;
 
 				//write to storage block
@@ -150,10 +150,10 @@ void allocateBlocks(void) {
 						
 						
 				}
-				nextFree[0] = unallocatedBlocks;				// set new nfree value
+				nextFree[0] = unallocatedBlocks;		// set new nfree value
 
 				//write to storage block
-				totalBytes = (storageBlockIdx * BLOCK_SIZE); //calculate block number
+				totalBytes = (storageBlockIdx * BLOCK_SIZE); 	//calculate block number
 				lseek(file_descriptor, totalBytes, SEEK_SET);
 				write(file_descriptor, nextFree, (unallocatedBlocks + 1) * sizeof(int));
 
@@ -182,8 +182,8 @@ int getFreeBlock(void) {
 	else{						//get new set of free blocks for free array
 		int newBlock = superBlock.free[0];			
 		int totalBytes = newBlock * BLOCK_SIZE;
-
-		lseek(file_descriptor, totalBytes, SEEK_SET);							//find block from free array
+		
+		lseek(file_descriptor, totalBytes, SEEK_SET);				//find block from free array
 		read(file_descriptor, superBlock.free, FREE_ARRAY_SIZE * sizeof(int)); //read in 251 blocks into free array
 		
 		superBlock.nfree = FREE_ARRAY_SIZE-1;					// update nfree
@@ -193,23 +193,11 @@ int getFreeBlock(void) {
 
 }
 
- 
-void writeInodeToBlock(int inodeX, inode_type inodeBlock) {
-	int blockNo, inodeOffset, totalBytes;
-	
-	blockNo = ((inodeX * INODE_SIZE) / BLOCK_SIZE) + 2; //calculate block number, start from Block 2
-	inodeOffset = (inodeX * INODE_SIZE) % BLOCK_SIZE;
-	totalBytes = (blockNo * BLOCK_SIZE) + inodeOffset;
-
-	lseek(file_descriptor, totalBytes, SEEK_SET);
-	write(file_descriptor, &inodeBlock, sizeof(inode_type));
-
-}
-
 void createRootDirectory(void) {
 	inode_type rootDir;
 	dir_type direc[2];
 	int freeBlock; 
+	int totalBytes; 
 
 	freeBlock = getFreeBlock();
 	if (freeBlock == -1) {							// System was full
@@ -217,14 +205,14 @@ void createRootDirectory(void) {
 		return;
 	}
 	
-	direc[0].inode = 1;								//1st inode = root directory
+	direc[0].inode = 1;							//1st inode = root directory
 	strcpy(direc[0].filename, ".");
 
-	direc[1].inode = 1;								//1st node = parent
+	direc[1].inode = 1;							//1st node = parent
 	strcpy(direc[1].filename, "..");
 	
 	// inode struct
-	rootDir.flags = INODE_ALLOC | DIREC_FILE; // I-node allocated + directory file 
+	rootDir.flags = (INODE_ALLOC | DIREC_FILE); 		// I-node allocated + directory file 
 	rootDir.nlinks = 1;
 	rootDir.uid = 0;
 	rootDir.gid = 0;
@@ -233,16 +221,18 @@ void createRootDirectory(void) {
 	rootDir.modtime = time(NULL);
 	
 	// directory size
-	rootDir.size0 = (int)((sizeof(direc) & 0xFFFFFFFF00000000) >> 8); // high 32 bit
-	rootDir.size1 = (int)(sizeof(direc) & 0x00000000FFFFFFFF); // low 32 bit
+	rootDir.size0 = (int)((sizeof(direc) & 0xFFFFFFFF00000000) >> 8); 	// high 32 bit
+	rootDir.size1 = (int)(sizeof(direc) & 0x00000000FFFFFFFF); 		// low 32 bit
 
-	writeInodeToBlock(1, rootDir);
-
+	//write inode to inode block
+	totalBytes = (2 * BLOCK_SIZE);
+	lseek(file_descriptor, totalBytes, SEEK_SET);
+	write(file_descriptor, rootDir, sizeof(inode_type));
 }
 
 void initfs (int total_blocks, int total_inode_blocks){
     int x;
-	superBlock.isize = total_inode_blocks; // total number of blocks for inode
+	superBlock.isize = total_inode_blocks; 		// total number of blocks for inode
 	superBlock.fsize = total_blocks;		// total blocks for system
 
     if (file_descriptor < 2)  //verify if a file is opened
@@ -256,10 +246,9 @@ void initfs (int total_blocks, int total_inode_blocks){
 	superBlock.ilock = 0;
 	superBlock.fmod = 0;
 	superBlock.time = time(NULL);
-
+	
 	//set all blocks as free
 	allocateBlocks();
-
 
     // writing the super block
 	lseek(file_descriptor, BLOCK_SIZE, SEEK_SET);
@@ -270,10 +259,16 @@ void initfs (int total_blocks, int total_inode_blocks){
 
 	// allocate other inodes as free
 	int num_inodes = (BLOCK_SIZE/INODE_SIZE)*superBlock.isize;
+	int blockNo, inodeBytes, inodeOffset, totalBytes;
 	for (x = 2; x <= num_inodes; x++) {
 		inode_type nodeX; 
 		nodeX.flags = INODE_FREE; // set inodes to free
-		writeInodeToBlock(x, nodeX);
+
+		inodeBytes = (x-1) * INODE_SIZE;		// total bytes for inode
+		totalBytes = (2 * BLOCK_SIZE) + inodeBytes;
+
+		lseek(file_descriptor, totalBytes, SEEK_SET);
+		write(file_descriptor, nodeX, sizeof(inode_type));
 	}
 
 	return; 
