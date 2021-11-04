@@ -259,7 +259,7 @@ void initfs (int total_blocks, int total_inode_blocks){
 
 	// allocate other inodes as free
 	int num_inodes = (BLOCK_SIZE/INODE_SIZE)*superBlock.isize;
-	int blockNo, inodeBytes, inodeOffset, totalBytes;
+	int inodeBytes, totalBytes;
 	for (x = 2; x <= num_inodes; x++) {
 		inode_type nodeX; 
 		nodeX.flags = INODE_FREE; // set inodes to free
