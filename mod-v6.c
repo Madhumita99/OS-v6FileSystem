@@ -89,10 +89,11 @@ void allocateBlocks(void) {
 	int storageBlockIdx = 0;
 	int nextStorageBlockIdx = 0;
 	int totalBytes = 0;
+	int i; 
 
 	if (unallocatedBlocks < FREE_ARRAY_SIZE) {		//number of blocks < free array size
 		nextnFree = unallocatedBlocks;
-		for (int i = 0; i < unallocatedBlocks; i++) {
+		for ( i = 0; i < unallocatedBlocks; i++) {
 			blockIdx += 1;
 			superBlock.free[i] = blockIdx;
 
@@ -103,7 +104,7 @@ void allocateBlocks(void) {
 	else {							//number of blocks < free array size
 		nextnFree = FREE_ARRAY_SIZE;
 		//write to free array to superblock
-		for (int i = 0; i < FREE_ARRAY_SIZE; i++) {
+		for ( i = 0; i < FREE_ARRAY_SIZE; i++) {
 			blockIdx += 1;
 			superBlock.free[i] = blockIdx;
 
@@ -117,7 +118,7 @@ void allocateBlocks(void) {
 
 			if (unallocatedBlocks > FREE_ARRAY_SIZE) {	//free blocks > 251
 				nextFree[FREE_ARRAY_SIZE] = storageBlockIdx;
-				for (int i = 1; i < FREE_ARRAY_SIZE; i++) {
+				for (i = 1; i < FREE_ARRAY_SIZE; i++) {
 					blockIdx += 1;
 					if (i == 1) {
 						nextFree[i] = blockIdx;
@@ -144,7 +145,7 @@ void allocateBlocks(void) {
 			}
 			else {
 				nextFree[unallocatedBlocks] = storageBlockIdx;		//free blocks < 251
-				for (int i = 1; i < unallocatedBlocks; i++) {
+				for ( i = 1; i < unallocatedBlocks; i++) {
 					blockIdx += 1;
 					nextFree[i] = blockIdx;
 
@@ -169,8 +170,9 @@ void allocateBlocks(void) {
 }
 
 int getFreeBlock(void) {
-	
-	superBlock.nfree -= 1;		//get next free block from free array
+	superBlock.nfree = 0;		// delete later
+	//int nextFree[252] = { 0 }; 
+	//superBlock.nfree -= 1;		//get next free block from free array
 	if (superBlock.nfree > 0) {
 		if (superBlock.free[superBlock.nfree] == 0) { //system is full, return error 
 			return -1;
@@ -181,11 +183,11 @@ int getFreeBlock(void) {
 	}
 	else {						//get new set of free blocks for free array
 		int newBlock = superBlock.free[0];
+		
 		int totalBytes = newBlock * BLOCK_SIZE;
 
 		lseek(file_descriptor, totalBytes, SEEK_SET);				//find block from free array
-		read(file_descriptor, superBlock.free, FREE_ARRAY_SIZE * sizeof(int)); //read in 251 blocks into free array
-		printf("%d", superBlock.free[FREE_ARRAY_SIZE - 1]);		//delete later
+		write(file_descriptor, superBlock.free, FREE_ARRAY_SIZE * sizeof(int)); //read in 251 blocks into free array
 
 		superBlock.nfree = FREE_ARRAY_SIZE;					// update nfree
 		return superBlock.free[superBlock.nfree];				// get free block from free array
