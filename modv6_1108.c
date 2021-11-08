@@ -72,7 +72,7 @@ void openfs(char* file_name) {
 	file_descriptor = open(file_name, O_RDWR);		//open file given
 
 	if (file_descriptor == -1) {				//file is not in system
-		file_descriptor = open(file_name, O_CREAT);	// create file
+		file_descriptor = open(file_name, O_CREAT | O_RDWR, 0700);	// create file
 		printf("file created and opened\n");
 	}
 	else {
