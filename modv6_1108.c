@@ -134,17 +134,19 @@ void allocateBlocks(void) {
 
 				}
 				nextFree[0] = FREE_ARRAY_SIZE;		// set new nfree value
-				storageBlockIdx = nextStorageBlockIdx;
+				
 
 				//write to storage block
 				totalBytes = (storageBlockIdx * BLOCK_SIZE); //calculate block number
 				lseek(file_descriptor, totalBytes, SEEK_SET);
-				write(file_descriptor, &nextFree, (FREE_ARRAY_SIZE + 1) * 4);
+				write(file_descriptor, nextFree, (FREE_ARRAY_SIZE + 1) * 4);
 
 				lseek(file_descriptor, totalBytes, SEEK_SET);
 				read(file_descriptor, test, (FREE_ARRAY_SIZE + 1) * 4);
 				printf("nfree: %d\n first block written: %d\n last block writen: %d\n", test[0], test[1], test[FREE_ARRAY_SIZE]); 
-				//update unallocated blocks
+				
+				//update new storage block and update unallocated blocks
+				storageBlockIdx = nextStorageBlockIdx;
 				unallocatedBlocks = unallocatedBlocks - FREE_ARRAY_SIZE;
 			}
 			else {
