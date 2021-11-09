@@ -251,7 +251,7 @@ void createRootDirectory(void) {
 	//write inode to inode block
 	totalBytes = (2 * BLOCK_SIZE);
 	lseek(file_descriptor, totalBytes, SEEK_SET);
-	write(file_descriptor, rootDir, INODE_SIZE);
+	write(file_descriptor, &rootDir, INODE_SIZE);
 
 	//write root directory to data block
 	totalBytes = (freeBlock * BLOCK_SIZE);
