@@ -1,6 +1,25 @@
-/* Group 2
-* Project 2
-* November 10, 2021
+/* Project 2 - Part 1
+*  November 10, 2021
+* 
+* Group 2 
+* Jessica Nguyen: main, modv6cmds, quit, flags & defines, & integration
+* Madhumita Ramesh: initfs, createRootDirectory, getFreeBlock
+* Micah Steinbrecher: openfs, allocateBlocks
+* 
+* How to compile: 
+* Load mod-v6.c file to cs1grads UTD server 
+* Compile using "gcc" command
+* Tested and compiled code on cs1grads UTD server
+* 
+* How to run the program: 
+* Program will prompt to "Enter commands:"
+* User can enter the following commands: 
+* 1. openfs X (X = file)
+* 2. initfs n1 n2 (n1= total number of blocks, n2 = total blocks for inodes and n1, n2 are numeric values)
+* 3. q (exit) 
+* 
+*
+*
 */
 
 #include <stdio.h>
@@ -10,10 +29,13 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+
 //system size info
 #define BLOCK_SIZE 1024
 #define FREE_ARRAY_SIZE 251 // free and inode array size
 #define INODE_SIZE 64
+#define MAX_NFREE 250
+#define DIR_SIZE 32
 
 typedef struct {
 	int isize; // number of blocks dedicated to i-list
@@ -72,7 +94,7 @@ void openfs(char* file_name) {
 	file_descriptor = open(file_name, O_RDWR);		//open file given
 
 	if (file_descriptor == -1) {				//file is not in system
-		file_descriptor = open(file_name, O_CREAT);	// create file
+		file_descriptor = open(file_name, O_CREAT | O_RDWR, 0600);	// create file with R&W
 		printf("file created and opened\n");
 	}
 	else {
@@ -82,83 +104,82 @@ void openfs(char* file_name) {
 }
 
 void allocateBlocks(void) {
-	int blockIdx = superBlock.isize + 1;			//isize + superBlock
+	unsigned int blockIdx = superBlock.isize + 2;			//isize + superBlock + Block0
 	int unallocatedBlocks = superBlock.fsize - blockIdx;	//total data blocks
-	int nextFree[252] = { 0 };				//next free array
-	int nextnFree = 0;					// nfree value
-	int storageBlockIdx = 0;
-	int nextStorageBlockIdx = 0;
-	int totalBytes = 0;
-	int i; 
+	unsigned int nextFree[252] = { 0 };				//next free array
+	unsigned int nextnFree = 0;					// nfree value
+	unsigned int storageBlockIdx = 0;
+	unsigned int nextStorageBlockIdx = 0;
+	unsigned int totalBytes = 0;
+	unsigned int i;
+
 
 	if (unallocatedBlocks < FREE_ARRAY_SIZE) {		//number of blocks < free array size
 		nextnFree = unallocatedBlocks;
-		for ( i = 0; i < unallocatedBlocks; i++) {
-			blockIdx += 1;
+		for (i = 0; i < unallocatedBlocks; i++) {	//write to free array
 			superBlock.free[i] = blockIdx;
-
+			blockIdx += 1;
 		}
-		superBlock.nfree = nextnFree;
+		superBlock.nfree = nextnFree - 1;
 		return;
 	}
 	else {							//number of blocks < free array size
-		nextnFree = FREE_ARRAY_SIZE;
+		nextnFree = MAX_NFREE;
 		//write to free array to superblock
-		for ( i = 0; i < FREE_ARRAY_SIZE; i++) {
-			blockIdx += 1;
-			superBlock.free[i] = blockIdx;
+		for (i = 0; i < FREE_ARRAY_SIZE; i++) {
 
+			superBlock.free[i] = blockIdx;
+			blockIdx += 1;
 		}
 
-		superBlock.nfree = nextnFree;
-		unallocatedBlocks = unallocatedBlocks - FREE_ARRAY_SIZE;
-		storageBlockIdx = superBlock.free[0];
+		superBlock.nfree = nextnFree;			//set nfree
+		unallocatedBlocks = unallocatedBlocks - FREE_ARRAY_SIZE;	//find number of unallocated blocks
+		storageBlockIdx = superBlock.free[0];		//next storage block value
 
-		while (unallocatedBlocks >= 0) {
+		while (blockIdx < superBlock.fsize) {
+
 
 			if (unallocatedBlocks > FREE_ARRAY_SIZE) {	//free blocks > 251
-				nextFree[FREE_ARRAY_SIZE] = storageBlockIdx;
-				for (i = 1; i < FREE_ARRAY_SIZE; i++) {
-					blockIdx += 1;
-					if (i == 1) {
+				nextFree[MAX_NFREE] = storageBlockIdx;
+
+				for (i = 0; i < MAX_NFREE; i++) {		//create array of free blocks
+					if (i == 0) {
 						nextFree[i] = blockIdx;
-						nextStorageBlockIdx = blockIdx;
+						nextStorageBlockIdx = blockIdx;	//store next storage block value
 					}
 					else {
-
 						nextFree[i] = blockIdx;
-
 					}
-
+					blockIdx += 1;
 
 				}
-				nextFree[0] = FREE_ARRAY_SIZE;		// set new nfree value
-				storageBlockIdx = nextStorageBlockIdx;
+				nextnFree = MAX_NFREE;	// set new nfree value
 
 				//write to storage block
 				totalBytes = (storageBlockIdx * BLOCK_SIZE); //calculate block number
-				lseek(file_descriptor, totalBytes, SEEK_SET);
-				write(file_descriptor, nextFree, (FREE_ARRAY_SIZE + 1) * sizeof(int));
+				lseek(file_descriptor, totalBytes, SEEK_SET);		//find block
+				write(file_descriptor, &nextnFree, sizeof(int));	//store nfree value in indirect block
+				write(file_descriptor, nextFree, (FREE_ARRAY_SIZE) * sizeof(int)); //store free blocks in indirect block
 
 				//update unallocated blocks
-				unallocatedBlocks = unallocatedBlocks - FREE_ARRAY_SIZE;
+				storageBlockIdx = nextStorageBlockIdx;			//keep track of next storage block
+				unallocatedBlocks = unallocatedBlocks - MAX_NFREE; //find number of blocks to allocate
 			}
 			else {
 				nextFree[unallocatedBlocks] = storageBlockIdx;		//free blocks < 251
-				for ( i = 1; i < unallocatedBlocks; i++) {
-					blockIdx += 1;
+				for (i = 0; i < unallocatedBlocks; i++) {			//create array of free blocks
 					nextFree[i] = blockIdx;
-
-
+					blockIdx += 1;
 				}
-				nextFree[0] = unallocatedBlocks;		// set new nfree value
+
+				nextnFree = unallocatedBlocks;		// set new nfree value
 
 				//write to storage block
 				totalBytes = (storageBlockIdx * BLOCK_SIZE); 	//calculate block number
 				lseek(file_descriptor, totalBytes, SEEK_SET);
-				write(file_descriptor, nextFree, (unallocatedBlocks + 1) * sizeof(int));
+				write(file_descriptor, &nextnFree, sizeof(int));	//store nfree value in indirect block
+				write(file_descriptor, nextFree, (unallocatedBlocks + 1) * sizeof(int)); //store free blocks in indirect block
 
-				unallocatedBlocks = -1;
 			}
 
 		}
@@ -170,9 +191,8 @@ void allocateBlocks(void) {
 }
 
 int getFreeBlock(void) {
-	superBlock.nfree = 0;		// delete later
-	//int nextFree[252] = { 0 }; 
-	//superBlock.nfree -= 1;		//get next free block from free array
+
+		superBlock.nfree -= 1;		//get next free block from free array
 	if (superBlock.nfree > 0) {
 		if (superBlock.free[superBlock.nfree] == 0) { //system is full, return error 
 			return -1;
@@ -183,13 +203,12 @@ int getFreeBlock(void) {
 	}
 	else {						//get new set of free blocks for free array
 		int newBlock = superBlock.free[0];
-		
-		int totalBytes = newBlock * BLOCK_SIZE;
+		int totalBytes = (newBlock * BLOCK_SIZE);
 
 		lseek(file_descriptor, totalBytes, SEEK_SET);				//find block from free array
-		write(file_descriptor, superBlock.free, FREE_ARRAY_SIZE * sizeof(int)); //read in 251 blocks into free array
+		read(file_descriptor, &superBlock.nfree, sizeof(int)); //read in nfree into super block
+		read(file_descriptor, superBlock.free, (FREE_ARRAY_SIZE) * sizeof(int)); // read 251 bytes to free array
 
-		superBlock.nfree = FREE_ARRAY_SIZE;					// update nfree
 		return superBlock.free[superBlock.nfree];				// get free block from free array
 	}
 
@@ -201,7 +220,8 @@ void createRootDirectory(void) {
 	dir_type direc[2];
 	int freeBlock;
 	int totalBytes;
-	
+	int writeBytes; 
+
 	freeBlock = getFreeBlock();
 	if (freeBlock == -1) {							// System was full
 		printf("No Free Blocks Available\n");
@@ -213,7 +233,7 @@ void createRootDirectory(void) {
 
 	direc[1].inode = 1;							//1st node = parent
 	strcpy(direc[1].filename, "..");
-
+	
 	// inode struct
 	rootDir.flags = (INODE_ALLOC | DIREC_FILE); 		// I-node allocated + directory file 
 	rootDir.nlinks = 1;
@@ -224,18 +244,19 @@ void createRootDirectory(void) {
 	rootDir.modtime = time(NULL);
 
 	// directory size
-	rootDir.size0 = (int)((sizeof(direc) & 0xFFFFFFFF00000000) >> 8); 	// high 32 bit
-	rootDir.size1 = (int)(sizeof(direc) & 0x00000000FFFFFFFF); 		// low 32 bit
+	writeBytes = DIR_SIZE * 2;
+	rootDir.size0 = (int)((writeBytes & 0xFFFFFFFF00000000) >> 8); 	// high 32 bit
+	rootDir.size1 = (int)(writeBytes & 0x00000000FFFFFFFF); 		// low 32 bit
 
 	//write inode to inode block
 	totalBytes = (2 * BLOCK_SIZE);
 	lseek(file_descriptor, totalBytes, SEEK_SET);
-	write(file_descriptor, rootDir, sizeof(inode_type));
+	write(file_descriptor, rootDir, INODE_SIZE);
 
 	//write root directory to data block
-	totalBytes = (freeBlock * BLOCK_SIZE); 
+	totalBytes = (freeBlock * BLOCK_SIZE);
 	lseek(file_descriptor, totalBytes, SEEK_SET);
-	write(file_descriptor, direc, sizeof(direc)); 
+	write(file_descriptor, direc, writeBytes);
 }
 
 void initfs(int total_blocks, int total_inode_blocks) {
@@ -245,7 +266,7 @@ void initfs(int total_blocks, int total_inode_blocks) {
 
 	if (file_descriptor < 2)  //verify if a file is opened
 	{
-		printf("File was not opened \n");
+		printf("File is opened \n");
 		return;
 	}
 	// defining variables of the superblock  ??? Ask prof
@@ -265,18 +286,19 @@ void initfs(int total_blocks, int total_inode_blocks) {
 	// create root directory for the first inode
 	createRootDirectory();
 
-	// allocate other inodes as free
-	int num_inodes = (BLOCK_SIZE / INODE_SIZE) * superBlock.isize;
-	int inodeBytes, totalBytes;
+	// find number of inodes in system
+	int num_inodes = (BLOCK_SIZE / INODE_SIZE) * superBlock.isize; 
+	int totalBytes;
+
+	// set other inodes to free
+	totalBytes = (2 * BLOCK_SIZE) + INODE_SIZE; //start from INODE 2
+	lseek(file_descriptor, totalBytes, SEEK_SET);
+
 	for (x = 2; x <= num_inodes; x++) {
 		inode_type nodeX;
 		nodeX.flags = INODE_FREE; // set inodes to free
 
-		inodeBytes = (x - 1) * INODE_SIZE;		// total bytes for inode
-		totalBytes = (2 * BLOCK_SIZE) + inodeBytes;
-
-		lseek(file_descriptor, totalBytes, SEEK_SET);
-		write(file_descriptor, nodeX, sizeof(inode_type));
+		write(file_descriptor, &nodeX, INODE_SIZE);		//write inode to block
 	}
 
 	return;
@@ -284,6 +306,7 @@ void initfs(int total_blocks, int total_inode_blocks) {
 
 
 void quit() {
+
 	exit(0); //exit system
 }
 
@@ -335,8 +358,8 @@ void modv6cmds(char* command) {
 					return;
 				}
 
-				if ((n1 < n2) && (n1 < 4)) {			//number of blocks system size < inode blocks 
-					printf("Invalid size\n");			// number of system blocks > superblock + inode block + data block
+				if ((n1 < (n2+2))) {			//number of blocks system size < inode blocks 
+					printf("Invalid size\n");		
 					return;
 				}
 
