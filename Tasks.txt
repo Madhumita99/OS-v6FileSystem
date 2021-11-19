@@ -1,0 +1,29 @@
+1. Micah - 
+- make a new entry after you create the file
+- can use addNewFileDirectoryEntry (JN)
+
+- quit: get time to superblock struct
+- update Block 1 (lseek(), write()) 
+
+
+- use rm file to reallocate blocks? 
+2. Madhu - 
+- add utility function for adding freeblocks back to free array
+- to make free inode = just set it to 0x0000
+- write parts for modv6cmds
+- update file size
+- update modtime & access time: ex. rootDir.modtime = time(NULL);
+- update accesstime: ex. rootDir.acttime = time(NULL);
+
+- cpout - change access time only
+- update the superblock - free array / write Block1 
+
+3. Jessica - 
+- combine modv6 with Micah's new version
+- update modv6cmds 
+- addNewFileDirectoryEntry  update file size 
+- change directory = update global current inode 
+- update modtime: ex. rootDir.modtime = time(NULL);
+- update access time: ex. rootDir.acttime = time(NULL);
+
+
