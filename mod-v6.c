@@ -208,6 +208,11 @@ int getFreeBlock(void) {
 		lseek(file_descriptor, totalBytes, SEEK_SET);				//find block from free array
 		read(file_descriptor, &superBlock.nfree, sizeof(int)); //read in nfree into super block
 		read(file_descriptor, superBlock.free, (FREE_ARRAY_SIZE) * sizeof(int)); // read 251 bytes to free array
+		
+		lseek(file_descriptor, BLOCK_SIZE, SEEK_SET);					//find superblock
+		write(file_descriptor, &superBlock.nfree, sizeof(int));			//write nfree to superblock
+		write(file_descriptor, superBlock.free, (FREE_ARRAY_SIZE) * sizeof(int));	//write new free to superblock
+
 
 		return superBlock.free[superBlock.nfree];				// get free block from free array
 	}
@@ -217,10 +222,10 @@ int getFreeBlock(void) {
 
 void createRootDirectory(void) {
 	inode_type rootDir;
-	dir_type direc[2];
+	dir_type direc[16]; /*** new **/
 	int freeBlock;
 	int totalBytes;
-	int writeBytes; 
+	long long writeBytes; /** new **/
 
 	freeBlock = getFreeBlock();
 	if (freeBlock == -1) {							// System was full
@@ -233,6 +238,12 @@ void createRootDirectory(void) {
 
 	direc[1].inode = 1;							//1st node = parent
 	strcpy(direc[1].filename, "..");
+	
+	/* new */
+	for (int i = 2; i < 16; i++) {					// other entries are empty
+		direc[i].inode = 0;
+	}
+	
 	
 	// inode struct
 	rootDir.flags = (INODE_ALLOC | DIREC_FILE); 		// I-node allocated + directory file 
