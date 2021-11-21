@@ -19,11 +19,13 @@
 - update the superblock - free array / write Block1 
 
 3. Jessica - 
-- combine modv6 with Micah's new version
-- update modv6cmds 
-- addNewFileDirectoryEntry  update file size 
-- change directory = update global current inode 
 - update modtime: ex. rootDir.modtime = time(NULL);
 - update access time: ex. rootDir.acttime = time(NULL);
+- Add error codes in 
+- update addnewentry to have "0"s in rest of code
 
 
+Issues: 
+- CPOUT - "node" is not correct
+- Need to check RM 
+- parent node of directory files are not set correctly
