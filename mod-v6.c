@@ -1,104 +1,55 @@
 /* Project 2 - Part 1
 *  November 10, 2021
-* 
-* Group 2 
-* Jessica Nguyen: main, modv6cmds, quit, flags & defines, & integration
+*
+* Group 2
+* Jessica Nguyen: main, modv6cmds, quit, flags & defines, & integrating modules
 * Madhumita Ramesh: initfs, createRootDirectory, getFreeBlock
 * Micah Steinbrecher: openfs, allocateBlocks
-* 
-* How to compile: 
-* Load mod-v6.c file to cs1grads UTD server 
-* Compile using "gcc" command
-* Tested and compiled code on cs1grads UTD server
-* 
-* How to run the program: 
-* Program will prompt to "Enter commands:"
-* User can enter the following commands: 
-* 1. openfs X (X = file)
-* 2. initfs n1 n2 (n1= total number of blocks, n2 = total blocks for inodes and n1, n2 are numeric values)
-* 3. q (exit) 
-* 
 *
+* How to compile:
+* Open SSH connection to csgrads1.utdallas.edu UTD linux server
+* Copy/Load mod-v6.c file to server directory
+* Compile using the following command in the terminal: "gcc mod-v6.c -o modv6"
+*
+* How to run the program:
+* In terminal, enter the following command to start the program: "./modv6"
+* Program will prompt to "Enter command:"
+* User can enter the following commands:
+* 1. openfs X (X = file name)
+* 2. initfs n1 n2 (n1 = total number of blocks, n2 = total blocks for inodes;  n1, n2 are numeric values)
+* 3. q
+*
+* When user is done with program, can use "q" command to exit the program
 *
 */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/types.h> 
 #include <sys/stat.h>
 #include <fcntl.h>
-
-
-//system size info
-#define BLOCK_SIZE 1024
-#define FREE_ARRAY_SIZE 251 // free and inode array size
-#define INODE_SIZE 64
-#define MAX_NFREE 250
-#define DIR_SIZE 32
-
-typedef struct {
-	int isize; // number of blocks dedicated to i-list
-	int fsize; // first block not potentially avaialble for allocation to a file
-	int nfree; //free array index
-	unsigned int free[FREE_ARRAY_SIZE]; // array of free blocks
-	int flock;
-	int ilock;
-	unsigned int fmod;
-	unsigned int time;
-} superblock_type; //1024 bytes
-
-
-/* i-node structure: 16 i-nodes/block */
-typedef struct {
-	unsigned short flags;
-	unsigned short nlinks;
-	unsigned int uid;
-	unsigned int gid;
-	unsigned int size0; /* high of 32 bit size*/
-	unsigned int size1; /* low int 32 bit size*/
-	unsigned int addr[9];
-	unsigned int actime;
-	unsigned int modtime;
-} inode_type;// 64 bytes
-
-/* directory struct */
-typedef struct {
-	unsigned int inode;
-	unsigned char filename[28];
-}dir_type; //32 bytes
-
-
-// flag bit comparisons
-#define INODE_ALLOC 0x8000 //A = 1 : I-node is allocated 
-#define INODE_FREE 0x0000  // A = 0: I-node is free
-#define BLOCK_FILE 0x6000 // BC = 11: block file
-#define DIREC_FILE 0x4000 // BC = 10: directory file
-#define CHAR_FILE 0x2000 // BC = 01: char special file
-#define PLAIN_FILE 0x0000 // BC = 00: plain file
-#define SMALL_FILE 0x0000		// DE = 00
-#define MEDIUM_FILE 0x0800		// DE = 01
-#define LONG_FILE 0x1000		// DE = 10
-#define SUPERLONG_FILE 0x1800	//DE = 11
-#define SETUID_EXEC 0x0400		//F = 1
-#define SETGID_EXEC 0x0200		//G = 1
-
-
+#include "mod-v6.h"
 
 // global variables
 superblock_type superBlock;
 int file_descriptor;
+char file_name[28];
+int currentInode; 
 
 
 void openfs(char* file_name) {
 	file_descriptor = open(file_name, O_RDWR);		//open file given
 
+
 	if (file_descriptor == -1) {				//file is not in system
+	
 		file_descriptor = open(file_name, O_CREAT | O_RDWR, 0600);	// create file with R&W
 		printf("file created and opened\n");
 	}
 	else {
 		printf("file opened\n");			//file found
+		/* new */
+		//read in superblock 
+		lseek(file_descriptor, BLOCK_SIZE, SEEK_SET); 
+		read(file_descriptor, &superBlock, BLOCK_SIZE); 
+
 	}
 	return;
 }
@@ -192,12 +143,22 @@ void allocateBlocks(void) {
 
 int getFreeBlock(void) {
 
-		superBlock.nfree -= 1;		//get next free block from free array
+	superBlock.nfree -= 1;		//get next free block from free array
 	if (superBlock.nfree > 0) {
 		if (superBlock.free[superBlock.nfree] == 0) { //system is full, return error 
 			return -1;
 		}
 		else {
+			lseek(file_descriptor, BLOCK_SIZE, SEEK_SET);					//find superblock
+			write(file_descriptor, &superBlock, BLOCK_SIZE);			//update nfree in superblock
+		
+
+			/* TEST */
+			superblock_type test;
+			lseek(file_descriptor, BLOCK_SIZE, SEEK_SET);					//find superblock
+			read(file_descriptor, &test, BLOCK_SIZE);
+			printf("Block #", superBlock.free[superBlock.nfree]);
+			/* END TEST */
 			return superBlock.free[superBlock.nfree];	//get free block from free array
 		}
 	}
@@ -208,10 +169,10 @@ int getFreeBlock(void) {
 		lseek(file_descriptor, totalBytes, SEEK_SET);				//find block from free array
 		read(file_descriptor, &superBlock.nfree, sizeof(int)); //read in nfree into super block
 		read(file_descriptor, superBlock.free, (FREE_ARRAY_SIZE) * sizeof(int)); // read 251 bytes to free array
-		
+
+		//write free array to superBlock
 		lseek(file_descriptor, BLOCK_SIZE, SEEK_SET);					//find superblock
-		write(file_descriptor, &superBlock.nfree, sizeof(int));			//write nfree to superblock
-		write(file_descriptor, superBlock.free, (FREE_ARRAY_SIZE) * sizeof(int));	//write new free to superblock
+		write(file_descriptor, &superBlock, BLOCK_SIZE);			//update nfree in superblock
 
 
 		return superBlock.free[superBlock.nfree];				// get free block from free array
@@ -238,13 +199,13 @@ void createRootDirectory(void) {
 
 	direc[1].inode = 1;							//1st node = parent
 	strcpy(direc[1].filename, "..");
-	
+
 	/* new */
-	for (int i = 2; i < 16; i++) {					// other entries are empty
+	for (int i = 2; i < 16; i++) {				//set rest of nodes to free
 		direc[i].inode = 0;
 	}
 	
-	
+
 	// inode struct
 	rootDir.flags = (INODE_ALLOC | DIREC_FILE); 		// I-node allocated + directory file 
 	rootDir.nlinks = 1;
@@ -256,18 +217,24 @@ void createRootDirectory(void) {
 
 	// directory size
 	writeBytes = DIR_SIZE * 2;
-	rootDir.size0 = (int)((writeBytes & 0xFFFFFFFF00000000) >> 8); 	// high 32 bit
-	rootDir.size1 = (int)(writeBytes & 0x00000000FFFFFFFF); 		// low 32 bit
+	rootDir.size0 = (int)((writeBytes & 0xFFFFFFFF00000000) >> 32); 	// high 64 bit
+	rootDir.size1 = (int)(writeBytes & 0x00000000FFFFFFFF); 		// low 64 bit
 
 	//write inode to inode block
 	totalBytes = (2 * BLOCK_SIZE);
 	lseek(file_descriptor, totalBytes, SEEK_SET);
 	write(file_descriptor, &rootDir, INODE_SIZE);
 
+
+
 	//write root directory to data block
 	totalBytes = (freeBlock * BLOCK_SIZE);
 	lseek(file_descriptor, totalBytes, SEEK_SET);
-	write(file_descriptor, direc, writeBytes);
+	write(file_descriptor, direc, BLOCK_SIZE);
+
+	
+
+	 
 }
 
 void initfs(int total_blocks, int total_inode_blocks) {
@@ -277,7 +244,7 @@ void initfs(int total_blocks, int total_inode_blocks) {
 
 	if (file_descriptor < 2)  //verify if a file is opened
 	{
-		printf("File is opened \n");
+		printf("File is not opened \n");
 		return;
 	}
 	// defining variables of the superblock  ??? Ask prof
@@ -294,11 +261,12 @@ void initfs(int total_blocks, int total_inode_blocks) {
 	lseek(file_descriptor, BLOCK_SIZE, SEEK_SET);
 	write(file_descriptor, &superBlock, BLOCK_SIZE);
 
+
 	// create root directory for the first inode
 	createRootDirectory();
 
 	// find number of inodes in system
-	int num_inodes = (BLOCK_SIZE / INODE_SIZE) * superBlock.isize; 
+	int num_inodes = (BLOCK_SIZE / INODE_SIZE) * superBlock.isize;
 	int totalBytes;
 
 	// set other inodes to free
@@ -312,6 +280,7 @@ void initfs(int total_blocks, int total_inode_blocks) {
 		write(file_descriptor, &nodeX, INODE_SIZE);		//write inode to block
 	}
 
+
 	return;
 }
 
@@ -320,8 +289,6 @@ void quit() {
 
 	exit(0); //exit system
 }
-
-
 
 void modv6cmds(char* command) {
 
@@ -337,6 +304,7 @@ void modv6cmds(char* command) {
 			args[1] = strtok(NULL, "\n");
 			openfs(args[1]); //pass file 
 		}
+		
 		else if ((strcmp(args[0], "initfs") == 0)) {
 			args[1] = strtok(NULL, " ");	// file system size in # blocks
 			args[2] = strtok(NULL, "\n");	// # nodes for i-nodes
@@ -369,8 +337,8 @@ void modv6cmds(char* command) {
 					return;
 				}
 
-				if ((n1 < (n2+2))) {			//number of blocks system size < inode blocks 
-					printf("Invalid size\n");		
+				if ((n1 < (n2 + 2))) {			//number of blocks system size < inode blocks 
+					printf("Invalid size\n");
 					return;
 				}
 
@@ -381,14 +349,37 @@ void modv6cmds(char* command) {
 			}
 
 		}
+
+
 		else if ((strcmp(args[0], "q\n") == 0)) {
 			quit();
+		}
+		else if ((strcmp(args[0], "cpin") == 0)) {
+			args[1] = strtok(NULL, " ");	// system external file
+			args[2] = strtok(NULL, "\n");	// file system v6 file
+			cpin(args[1], args[2]);
+		}
+		else if ((strcmp(args[0], "cpout") == 0)) {
+			args[1] = strtok(NULL, " ");	// system external file
+			args[2] = strtok(NULL, "\n");	// file system v6 file
+			cpout(args[1], args[2]);
+		}
+		else if ((strcmp(args[0], "rm") == 0)) {
+			args[1] = strtok(NULL, "\n");	// file system v6 file
+			rm(args[1]);
+		}
+		else if ((strcmp(args[0], "mkdir") == 0)) {
+			args[1] = strtok(NULL, "");	// file system v6 directory
+			mkdirv6(args[1]); 
+   		}
+		else if ((strcmp(args[0], "cd") == 0)) {
+			args[1] = strtok(NULL, "");	// # nodes for i-nodes
+			changeDirectoryV6(args[1]);
 		}
 		else {
 			printf("Invalid Command\n");
 		}
 	}
-
 	else {
 		printf("Invalid Command\n");
 	}
@@ -399,6 +390,7 @@ void modv6cmds(char* command) {
 int main(void) {
 	char command[512];
 	file_descriptor = 0;
+	currentInode = 1; // start at the root directory; 
 
 	while (1) {
 		printf("Enter command:");
