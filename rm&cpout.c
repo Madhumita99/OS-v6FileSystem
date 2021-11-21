@@ -124,15 +124,10 @@ void rm(char* filename){
                     // add the block number to the free array
                     addFreeBlock(block);
                 }
-                node.flags = (1<<15);                           // make the inode free by setting the flag
+		directory[i].inode = 0;				// this directory entry no longer exists so making inode 0
+                node.flags = 0;                           	// make the inode free by setting the flag
                 node.modtime = time(NULL);                      // updating the modifying time
                 node.actime = time(NULL);                       // updating the accessing time
-                
-                directory[i]=directory[(inode_size/sizeof(dir_type))-1];
-                inode_size -= sizeof(dir_type);
-
-                node.size0 = (int)((inode_size & 0xFFFFFFFF00000000) >> 32);        // high 64 bit
-                node.size1 = (int)(inode_size & 0x00000000FFFFFFFF);                 // low 64 bit
 
                 // writing the updated directory into the block at it's correct position
                 lseek(file_descriptor, (BLOCK_SIZE*node.addr[0]), SEEK_SET);
