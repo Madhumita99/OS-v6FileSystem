@@ -125,11 +125,12 @@ void allocateBlocks(void) {
 
 	if (unallocatedBlocks < FREE_ARRAY_SIZE) {		//number of blocks < free array size
 		nextnFree = unallocatedBlocks;
-		for (i = 0; i < unallocatedBlocks; i++) {	//write to free array
+		superBlock.free[1] = 0;
+		for (i = 2; i < unallocatedBlocks + 2; i++) {	//write to free array
 			superBlock.free[i] = blockIdx;
 			blockIdx += 1;
 		}
-		superBlock.nfree = nextnFree - 1;
+		superBlock.nfree = nextnFree + 2;
 		return;
 	}
 	else {							//number of blocks < free array size
@@ -310,13 +311,15 @@ void initfs(int total_blocks, int total_inode_blocks) {
 
 		write(file_descriptor, &nodeX, INODE_SIZE);		//write inode to block
 	}
-
+	superblock_type testsuper = superBlock;
 	return;
 }
 
 
 void quit() {
-
+    superBlock.time = time(NULL);
+    lseek(file_descriptor, 1024, SEEK_SET);
+    write(file_descriptor, &superBlock, BLOCK_SIZE);
 	exit(0); //exit system
 }
 
@@ -360,17 +363,24 @@ int cpin (char* externalFile, char* internalFile) {
 
     //get blocks
     int num_of_blocks = file_size/1024 + (file_size % 1024 != 0);
+    int nfree_reset = superBlock.nfree;
+    int free_reset[251];
+    memcpy(free_reset, superBlock.free, sizeof(free_reset));
 
-    if (num_of_blocks > free_data_blocks){
-        printf("not enough system memory\n");
-        return -1;
-    }
 
 
     //get data blocks
     int blocks[ num_of_blocks ];
     for (int i = 0; i < num_of_blocks; i++) {
         int free_block = getFreeBlock();
+        if (free_block == -1){
+            printf("not enough system memory\n");
+            //reset superblock
+            superBlock.nfree = nfree_reset;
+            memcpy(superBlock.free, free_reset, sizeof(free_reset));
+            superblock_type testSuper = superBlock;
+            return -1;
+        }
         blocks[i] = free_block;
     }
 
@@ -432,8 +442,12 @@ int cpin (char* externalFile, char* internalFile) {
     lseek(file_descriptor, inode_offset, SEEK_SET);
     read(file_descriptor, test_inode, 64);*/
 
-    //TODO
-    //add file to parent directory inode
+    //TODO TEST
+/*    dir_type dir_entry;
+    int inode_idx = (inode_offset - 2*1024)/64;
+    dir_entry.inode = inode_idx;
+    strcpy(dir_entry.filename, internalFile);
+    addNewFileDirectoryEntry(currentInode, dir_entry);*/
 
     return 1;
 }
