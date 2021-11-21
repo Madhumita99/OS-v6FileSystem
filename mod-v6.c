@@ -157,7 +157,7 @@ int getFreeBlock(void) {
 			superblock_type test;
 			lseek(file_descriptor, BLOCK_SIZE, SEEK_SET);					//find superblock
 			read(file_descriptor, &test, BLOCK_SIZE);
-			printf("Block #", superBlock.free[superBlock.nfree]);
+			printf("Block #%d\n", superBlock.free[superBlock.nfree]);
 			/* END TEST */
 			return superBlock.free[superBlock.nfree];	//get free block from free array
 		}
