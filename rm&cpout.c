@@ -51,7 +51,6 @@ void cpout(char* sourceFile, char* destinationFile) {
 	    if (strcmp(sourceFile, directory[i].filename) == 0){    // if the file to be copied to external file has been found
 
 	        inode_type fileInode = getInode(directory[i].inode);
-	        unsigned int* fileBlocks = fileInode.addr;          // storing the block numbers of the inode of the filename to be copied
 	        
 	        if(fileInode.flags == (1 << 15)){                   // if the inode is allocated
 	            
@@ -61,13 +60,13 @@ void cpout(char* sourceFile, char* destinationFile) {
                 // iterates through every block in the addr and stores the content in buffer
 	            for (j =0; j < fileInode_size/BLOCK_SIZE; j++){
 	                
-	                block = fileBlocks[j];
+	                block = fileInode.addr[j];
 	                lseek(file_descriptor, (block*BLOCK_SIZE), SEEK_SET);
 	                read(file_descriptor, buffer, BLOCK_SIZE);
 	                write(destination, buffer,BLOCK_SIZE);
 	            }
                 // stores the offset of the last block into the buffer
-	            block = fileBlocks[j];
+	            block = fileInode.addr[j];
 	            lseek(file_descriptor, (block*BLOCK_SIZE), SEEK_SET);
 	            read(file_descriptor, buffer, fileInode_size %BLOCK_SIZE);
 	            write(destination, buffer,fileInode_size % BLOCK_SIZE);
@@ -109,7 +108,6 @@ void rm(char* filename){
 	    if (strcmp(filename, directory[i].filename) == 0){      // if the file to be deleted has been found
 	        
 	        inode_type fileInode = getInode(directory[i].inode);
-	        unsigned int* fileBlocks = fileInode.addr;          // storing the block numbers of the inode of the filename to be copied
 	        
 	        if (fileInode.flags == (1<<15)){                    // to check if the inode is allocated or not
 	            // calculates the size of file 
