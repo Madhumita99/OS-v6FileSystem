@@ -1,11 +1,11 @@
-int currentInode;                                               // saves the inode of the current directory 
+#include "mod-v6.h"
 
 inode_type getInode(int inodeNumber){
     
     inode_type inode;
     int block = 2 + ((INODE_SIZE*inodeNumber) / BLOCK_SIZE);    // calculates the block number where the inode is present
-    int offset = (INODE_SIZE*inodeNumber) % BLOCK_SIZE;         // calculates the offset within the block
-    lseek(file_descriptor, (BLOCK_SIZE*block), SEEK_SET);
+    int offset = (INODE_SIZE*(inodeNumber-1)) % BLOCK_SIZE;         // calculates the offset within the block
+    lseek(file_descriptor, (BLOCK_SIZE*block)+offset, SEEK_SET);
     read(file_descriptor, &inode, INODE_SIZE);                  // reads the inode values into inode variable
     return inode;
 }
@@ -51,7 +51,7 @@ void cpout(char* sourceFile, char* destinationFile) {
 	    if (strcmp(sourceFile, directory[i].filename) == 0){    // if the file to be copied to external file has been found
 
 	        inode_type fileInode = getInode(directory[i].inode);
-	        unsigned int* fileBlocks = fileInode.addr;          // storing the block numbers of the inode of the filename to be copied
+	        //unsigned int* fileBlocks = fileInode.addr;          // storing the block numbers of the inode of the filename to be copied
 	        
 	        if(fileInode.flags == (1 << 15)){                   // if the inode is allocated
 	            
@@ -59,15 +59,16 @@ void cpout(char* sourceFile, char* destinationFile) {
 	            long fileInode_size = (fileInode.size0 << 32) | (fileInode.size1);
 
                 // iterates through every block in the addr and stores the content in buffer
+                lseek(destination, 0, SEEK_SET);
 	            for (j =0; j < fileInode_size/BLOCK_SIZE; j++){
-	                
-	                block = fileBlocks[j];
+
+	                block = fileInode.addr[j];
 	                lseek(file_descriptor, (block*BLOCK_SIZE), SEEK_SET);
 	                read(file_descriptor, buffer, BLOCK_SIZE);
 	                write(destination, buffer,BLOCK_SIZE);
 	            }
                 // stores the offset of the last block into the buffer
-	            block = fileBlocks[j];
+	            block = fileInode.addr[j];
 	            lseek(file_descriptor, (block*BLOCK_SIZE), SEEK_SET);
 	            read(file_descriptor, buffer, fileInode_size %BLOCK_SIZE);
 	            write(destination, buffer,fileInode_size % BLOCK_SIZE);
@@ -75,7 +76,7 @@ void cpout(char* sourceFile, char* destinationFile) {
                 node.actime = time(NULL);
                 // writing the updated inode into the block at it's correct position 
                 int inode_block = (currentInode*INODE_SIZE) / BLOCK_SIZE;
-                int offset = currentInode*INODE_SIZE) % BLOCK_SIZE;
+                int offset = (currentInode*INODE_SIZE) % BLOCK_SIZE;
                 lseek(file_descriptor, (inode_block*BLOCK_SIZE) + offset, SEEK_SET);
                 read(file_descriptor, node, sizeof(inode_type));
 	            
@@ -117,20 +118,20 @@ void rm(char* filename){
 	            
 	            // iterates through every block in the addr and add the blocks to the free array
 	            for (j =0; j < fileInode_size/BLOCK_SIZE; j++){
-	                block = addr[j];
+	                block = fileInode.addr[j];
 	                // add the block number to the free array
                     addFreeBlock(block);
 	            }
 	            if ( 0<fileInode_size%BLOCK_SIZE ){
-                    block = addr[j];
+                    block = fileInode.addr[j];
                     // add the block number to the free array
                     addFreeBlock(block);
                 }
-                node.flags = (1<<15);                           // make the inode free by setting the flag
+                directory[i].inode = 0;				// this directory entry no longer exists so making inode 0
+                node.flags = 0;
                 node.modtime = time(NULL);                      // updating the modifying time
                 node.actime = time(NULL);                       // updating the accessing time
                 
-                directory[i]=directory[(inode_size/sizeof(dir_type))-1];
                 inode_size -= sizeof(dir_type);
 
                 node.size0 = (int)((inode_size & 0xFFFFFFFF00000000) >> 32);        // high 64 bit
@@ -141,7 +142,7 @@ void rm(char* filename){
                 write(file_descriptor, directory, inode_size);
                 // writing the updated inode into the block at it's correct position 
                 int inode_block = (currentInode*INODE_SIZE) / BLOCK_SIZE;
-                int offset = currentInode*INODE_SIZE) % BLOCK_SIZE;
+                int offset = (currentInode*INODE_SIZE) % BLOCK_SIZE;
                 lseek(file_descriptor, (inode_block*BLOCK_SIZE) + offset, SEEK_SET);
                 read(file_descriptor, node, sizeof(inode_type));
 	        }
@@ -151,4 +152,5 @@ void rm(char* filename){
 	        return;
 	    }
 	}
+
 }

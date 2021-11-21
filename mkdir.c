@@ -166,7 +166,7 @@ void mkdirv6(char* dir_name) {
 *
 */
 
-void addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
+int addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 	inode_type parentNode;
 
 	//get file inode struct
@@ -227,7 +227,7 @@ void addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 		int freeBlock = getFreeBlock();
 		if (freeBlock == -1) {							// System was full
 			printf("No Free Blocks Available\n");
-			return;
+			return -1;
 		}
 		int nextBlock = size / BLOCK_SIZE; 
 
@@ -256,8 +256,7 @@ void addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 	// update inode entry
 	updateInodeEntry(DIR_SIZE, parentInodeNum, parentNode);
 
-	
-	return;
+	return 1;
 
 }
 
@@ -270,7 +269,10 @@ void addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 *
 */
 void changeDirectoryV6(char* dir_name) {
-	// search through directory entries and then change current inode to last directory entry value
+    //TODO test
+    int testCurrentInodeBefore = currentInode;
+
+    // search through directory entries and then change current inode to last directory entry value
 
 	int freeBlock;
 	int totalBytes;
@@ -328,7 +330,11 @@ void changeDirectoryV6(char* dir_name) {
 	else {
 		printf("Directory not found\n");
 	}
-	return; 
+
+    //TODO test
+    int testCurrentInodeAfter = currentInode;
+
+    return;
 	
 }
 

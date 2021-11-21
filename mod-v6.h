@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 
 
@@ -66,6 +70,11 @@ extern int currentInode;
 extern int getFreeInode(void);
 void updateInodeEntry(int addBytes, int inodeNum, inode_type newNode);
 void mkdirv6(char* dir_name);
-void addNewFileDirectoryEntry(int parentInode, dir_type newDir);
+int addNewFileDirectoryEntry(int parentInode, dir_type newDir);
 void changeDirectoryV6(char* dir_name); 
-int findDirectory(char* dir_name, int parentNode); 
+int findDirectory(char* dir_name, int parentNode);
+int cpin (char* externalFile, char* internalFile);
+void cpout(char* sourceFile, char* destinationFile);
+void rm(char* filename);
+void addFreeBlock (int block);
+inode_type getInode(int inodeNumber);

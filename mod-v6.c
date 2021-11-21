@@ -22,9 +22,7 @@
 * When user is done with program, can use "q" command to exit the program
 *
 */
-#include <sys/types.h> 
-#include <sys/stat.h>
-#include <fcntl.h>
+
 #include "mod-v6.h"
 
 // global variables
@@ -67,11 +65,12 @@ void allocateBlocks(void) {
 
 	if (unallocatedBlocks < FREE_ARRAY_SIZE) {		//number of blocks < free array size
 		nextnFree = unallocatedBlocks;
-		for (i = 0; i < unallocatedBlocks; i++) {	//write to free array
+        superBlock.free[1] = 0;
+        for (i = 2; i < unallocatedBlocks + 2; i++) {
 			superBlock.free[i] = blockIdx;
 			blockIdx += 1;
 		}
-		superBlock.nfree = nextnFree - 1;
+		superBlock.nfree = nextnFree + 1;
 		return;
 	}
 	else {							//number of blocks < free array size
@@ -285,8 +284,11 @@ void initfs(int total_blocks, int total_inode_blocks) {
 }
 
 
-void quit() {
 
+void quit() {
+    superBlock.time = time(NULL);
+    lseek(file_descriptor, 1024, SEEK_SET);
+    write(file_descriptor, &superBlock, BLOCK_SIZE);
 	exit(0); //exit system
 }
 
@@ -386,6 +388,8 @@ void modv6cmds(char* command) {
 
 	return;
 }
+
+
 
 int main(void) {
 	char command[512];
