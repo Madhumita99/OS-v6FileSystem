@@ -96,11 +96,11 @@ void mkdirv6(char* dir_name) {
 
 	while(folder != NULL){
 		fp = findDirectory(folder, parentInode);
-		if (fp < 0) {
+		if (fp == 0) {
 			newEntry = 1; 
 			break;
 		}
-		else if (fp == 0) {
+		else if (fp == -1) {
 			printf("Error: File is not a directory file\n");
 			break; 
 		}
@@ -409,7 +409,7 @@ int findDirectory(char* dir_name, int parentNode) {
 	// check to see if inode is a directory file 
 	if ((rootNode.flags & DIREC_FILE) != DIREC_FILE) { //not a directory file
 		printf("File is not a directory file\n"); 
-		return 0;
+		return -1;
 	}
 
 	// go to size and see what is size
@@ -419,7 +419,7 @@ int findDirectory(char* dir_name, int parentNode) {
 	int readBlocks[8];
 	dir_type buffer [DIR_SIZE];
 	int totalBlocks = size / BLOCK_SIZE; // total blocks in file
-	int fpFound = -1; // folder Inode 
+	int fpFound = 0; // folder Inode
 
 	while (totalBlocks > -1) {
 

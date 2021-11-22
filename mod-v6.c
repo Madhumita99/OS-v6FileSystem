@@ -182,9 +182,9 @@ void allocateBlocks(void) {
 
 int getFreeBlock(void) {
 
-	//superBlock.nfree -= 1;		//get next free block from free array
+	superBlock.nfree -= 1;		//get next free block from free array
 	/*TEST */
-	superBlock.nfree = 0; 
+	//superBlock.nfree = 0;
 	//END TEST
 
 	if (superBlock.nfree > 0) {  
@@ -435,6 +435,9 @@ void modv6cmds(char* command) {
 			args[1] = strtok(NULL, "");	// # nodes for i-nodes
 			changeDirectoryV6(args[1]);
 		}
+        else if ((strcmp(args[0], "ls\n") == 0)) {
+            ls();
+        }
 		else {
 			printf("Invalid Command\n");
 		}

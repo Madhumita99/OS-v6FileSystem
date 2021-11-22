@@ -73,8 +73,10 @@ void changeDirectoryV6(char* dir_name);
 int findDirectory(char* dir_name, int parentNode); 
 int fileSystemCheck(void);
 
-inode_type getInode(int inodeNumber); 
-void addFreeBlock(int block); 
+inode_type getInode(unsigned int inodeNumber);
+void addFreeBlock(unsigned int block);
 void cpout(char* sourceFile, char* destinationFile); 
-void rm(char* filename); 
+void rm(char* filename);
+void ls(void);
+
 
