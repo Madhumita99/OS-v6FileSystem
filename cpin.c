@@ -22,16 +22,28 @@
 //sizes are in bytes
 int cpin (char* externalFile, char* internalFile) {
     //get length of external file
-    int file_size;
+
+    unsigned long file_size;
     inode_type inode;
     int offset;
-    int inode_size;
+    unsigned long inode_size;
 
-    int source_fd = open(externalFile, O_RDONLY);
-    if (source_fd == -1) {
-        printf("file not found\n");
+
+    //check if file system is opened & valid
+    int check = fileSystemCheck();
+    if (check == -1)  //issue with file system
+    {
         return -1;
     }
+
+    //check external file is open
+    int source_fd = open(externalFile, O_RDONLY);
+    if (source_fd == -1) {
+        printf("Error: File not found\n");
+        return -1;
+    }
+
+
 
     file_size = lseek(source_fd, 0, SEEK_END); // seek to end of file
     lseek(source_fd, 0, SEEK_SET); // seek back to beginning of file
@@ -46,14 +58,20 @@ int cpin (char* externalFile, char* internalFile) {
 
 
     //get data blocks
+
     int blocks[ num_of_blocks ];
     for (int i = 0; i < num_of_blocks; i++) {
         int free_block = getFreeBlock();
         if (free_block == -1){
-            printf("not enough system memory\n");
+            printf("Error: Not enough system memory\n");
             //reset superblock
             superBlock.nfree = nfree_reset;
             memcpy(superBlock.free, free_reset, sizeof(free_reset));
+            
+            //rewrite superblock
+            lseek(file_descriptor, BLOCK_SIZE, SEEK_SET);					//find superblock
+            write(file_descriptor, &superBlock, BLOCK_SIZE);			//update nfree in superblock
+
             superblock_type testSuper = superBlock;
             return -1;
         }
@@ -68,6 +86,7 @@ int cpin (char* externalFile, char* internalFile) {
         }
         char buffer[bytes];
         offset = blocks[i] * 1024;
+                
         lseek(file_descriptor, offset, SEEK_SET);
         read(source_fd, buffer, bytes);
         write(file_descriptor, buffer, bytes);
@@ -89,6 +108,8 @@ int cpin (char* externalFile, char* internalFile) {
 
     //get inode for new file
     int inode_idx = getFreeInode();
+
+
     //set fields except address
     inode.flags = (INODE_ALLOC | PLAIN_FILE); 		// I-node allocated + directory file
     inode.nlinks = 1;
@@ -120,7 +141,12 @@ int cpin (char* externalFile, char* internalFile) {
     dir_type dir_entry;
     dir_entry.inode = inode_idx;
     strcpy(dir_entry.filename, internalFile);
-    addNewFileDirectoryEntry(currentInode, dir_entry);
+
+
+    check= addNewFileDirectoryEntry(currentInode, dir_entry);
+    if (check < 0) {		//error occurred
+        return -1;
+    }
 
     return 1;
 }

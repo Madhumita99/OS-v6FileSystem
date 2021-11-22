@@ -79,3 +79,6 @@ void rm(char* filename);
 void addFreeBlock (int block);
 inode_type getInode(int inodeNumber);
 void ls(void);
+int fileSystemCheck(void);
+
+

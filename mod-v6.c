@@ -39,10 +39,10 @@ void openfs(char* file_name) {
 	if (file_descriptor == -1) {				//file is not in system
 	
 		file_descriptor = open(file_name, O_CREAT | O_RDWR, 0600);	// create file with R&W
-		printf("file created and opened\n");
+		printf("File created and opened\n");
 	}
 	else {
-		printf("file opened\n");			//file found
+		printf("File opened\n");			//file found
 		/* new */
 		//read in superblock 
 		lseek(file_descriptor, BLOCK_SIZE, SEEK_SET); 
@@ -70,7 +70,28 @@ void allocateBlocks(void) {
 			superBlock.free[i] = blockIdx;
 			blockIdx += 1;
 		}
-		superBlock.nfree = nextnFree + 1;
+
+
+		superBlock.nfree = nextnFree;
+
+		storageBlockIdx = superBlock.free[0]; 
+		
+		
+		//write last storage block
+		nextFree[2] = storageBlockIdx;
+		nextFree[1] = 0;
+		nextFree[0] = 0;
+		nextnFree = 2;
+		totalBytes = (storageBlockIdx * BLOCK_SIZE); 	//calculate block number
+		lseek(file_descriptor, totalBytes, SEEK_SET);
+		write(file_descriptor, &nextnFree, sizeof(int));	//store nfree value in indirect block
+		write(file_descriptor, nextFree, sizeof(int)*FREE_ARRAY_SIZE);
+
+		/*test */
+		int testFree [10]; 
+		lseek(file_descriptor, totalBytes, SEEK_SET);
+		read(file_descriptor, testFree, sizeof(int)*10); 
+		/*end test*/
 		return;
 	}
 	else {							//number of blocks < free array size
@@ -118,6 +139,10 @@ void allocateBlocks(void) {
 			else {
 				nextFree[unallocatedBlocks] = storageBlockIdx;		//free blocks < 251
 				for (i = 0; i < unallocatedBlocks; i++) {			//create array of free blocks
+					if (i == 0) {
+						nextStorageBlockIdx = blockIdx;	//store next storage block value
+					}
+
 					nextFree[i] = blockIdx;
 					blockIdx += 1;
 				}
@@ -128,23 +153,50 @@ void allocateBlocks(void) {
 				totalBytes = (storageBlockIdx * BLOCK_SIZE); 	//calculate block number
 				lseek(file_descriptor, totalBytes, SEEK_SET);
 				write(file_descriptor, &nextnFree, sizeof(int));	//store nfree value in indirect block
-				write(file_descriptor, nextFree, (unallocatedBlocks + 1) * sizeof(int)); //store free blocks in indirect block
+				write(file_descriptor, nextFree, (unallocatedBlocks + 1) * sizeof(int)); //store free blocks in indirect block + indirect block #
 
+				//last storage block
+				storageBlockIdx = nextStorageBlockIdx;
 			}
 
 		}
 
+		
+		//write last storage block
+		nextFree[2] = storageBlockIdx;
+		nextFree[1] = 0;
+		nextFree[0] = 0;
+		nextnFree = 2;
+		totalBytes = (storageBlockIdx * BLOCK_SIZE); 	//calculate block number
+		lseek(file_descriptor, totalBytes, SEEK_SET);
+		write(file_descriptor, &nextnFree, sizeof(int));	//store nfree value in indirect block
+		write(file_descriptor, nextFree, sizeof(int)* FREE_ARRAY_SIZE);
+
+		/*test */
+		int testFree[10];
+		lseek(file_descriptor, totalBytes, SEEK_SET);
+		read(file_descriptor, testFree, sizeof(int) * 10);
+		printf("test"); 
+		/*end test*/
+		return;
 	}
-
-
 
 }
 
 int getFreeBlock(void) {
 
-	superBlock.nfree -= 1;		//get next free block from free array
-	if (superBlock.nfree > 0) {
+	//superBlock.nfree -= 1;		//get next free block from free array
+	/*TEST */
+	superBlock.nfree = 0; 
+	//END TEST
+
+	if (superBlock.nfree > 0) {  
 		if (superBlock.free[superBlock.nfree] == 0) { //system is full, return error 
+
+			superBlock.nfree++; 
+			lseek(file_descriptor, BLOCK_SIZE, SEEK_SET);					//find superblock
+			write(file_descriptor, &superBlock, BLOCK_SIZE);			//update nfree in superblock
+
 			return -1;
 		}
 		else {
@@ -156,9 +208,10 @@ int getFreeBlock(void) {
 			superblock_type test;
 			lseek(file_descriptor, BLOCK_SIZE, SEEK_SET);					//find superblock
 			read(file_descriptor, &test, BLOCK_SIZE);
-			printf("Block #%d\n", superBlock.free[superBlock.nfree]);
+			printf("Block # %d\n", superBlock.free[superBlock.nfree]);
 			/* END TEST */
 			return superBlock.free[superBlock.nfree];	//get free block from free array
+
 		}
 	}
 	else {						//get new set of free blocks for free array
@@ -173,7 +226,6 @@ int getFreeBlock(void) {
 		lseek(file_descriptor, BLOCK_SIZE, SEEK_SET);					//find superblock
 		write(file_descriptor, &superBlock, BLOCK_SIZE);			//update nfree in superblock
 
-
 		return superBlock.free[superBlock.nfree];				// get free block from free array
 	}
 
@@ -185,7 +237,7 @@ void createRootDirectory(void) {
 	dir_type direc[16]; /*** new **/
 	int freeBlock;
 	int totalBytes;
-	long long writeBytes; /** new **/
+	unsigned long writeBytes; /** new **/
 
 	freeBlock = getFreeBlock();
 	if (freeBlock == -1) {							// System was full
@@ -208,7 +260,7 @@ void createRootDirectory(void) {
 	// inode struct
 	rootDir.flags = (INODE_ALLOC | DIREC_FILE); 		// I-node allocated + directory file 
 	rootDir.nlinks = 1;
-	rootDir.uid = 0;
+	rootDir.uid = 0; 
 	rootDir.gid = 0;
 	rootDir.addr[0] = freeBlock;
 	rootDir.actime = time(NULL);
@@ -243,7 +295,7 @@ void initfs(int total_blocks, int total_inode_blocks) {
 
 	if (file_descriptor < 2)  //verify if a file is opened
 	{
-		printf("File is not opened \n");
+		printf("Error: File is not opened \n");
 		return;
 	}
 	// defining variables of the superblock  ??? Ask prof
@@ -284,6 +336,13 @@ void initfs(int total_blocks, int total_inode_blocks) {
 }
 
 
+
+void quit() {
+	if (superBlock.fsize > 0 && superBlock.isize > 0 ) {
+		superBlock.time = time(NULL);							//update super block access time
+		lseek(file_descriptor, BLOCK_SIZE, SEEK_SET);
+		write(file_descriptor, &superBlock, BLOCK_SIZE);
+	}
 
 void quit() {
     superBlock.time = time(NULL);
@@ -359,7 +418,13 @@ void modv6cmds(char* command) {
 		else if ((strcmp(args[0], "cpin") == 0)) {
 			args[1] = strtok(NULL, " ");	// system external file
 			args[2] = strtok(NULL, "\n");	// file system v6 file
-			cpin(args[1], args[2]);
+			int check = cpin(args[1], args[2]);
+			if (check > 0) {
+				printf("File transfer success\n"); 
+			}
+			else {
+				printf("File transfer failed\n"); 
+			}
 		}
 		else if ((strcmp(args[0], "cpout") == 0)) {
 			args[1] = strtok(NULL, " ");	// system external file
@@ -396,7 +461,7 @@ void modv6cmds(char* command) {
 
 int main(void) {
 	char command[512];
-	file_descriptor = 0;
+	file_descriptor = -1;
 	currentInode = 1; // start at the root directory; 
 
 	while (1) {
