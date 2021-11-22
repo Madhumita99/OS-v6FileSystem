@@ -378,6 +378,9 @@ void modv6cmds(char* command) {
 			args[1] = strtok(NULL, "");	// # nodes for i-nodes
 			changeDirectoryV6(args[1]);
 		}
+        else if ((strcmp(args[0], "ls\n") == 0)) {
+            ls();
+        }
 		else {
 			printf("Invalid Command\n");
 		}
