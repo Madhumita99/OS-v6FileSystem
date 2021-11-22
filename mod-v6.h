@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <sys/types.h> 
+#include <sys/stat.h>
+#include <fcntl.h>
 
 
 //system size info
@@ -63,9 +65,16 @@ extern int file_descriptor;
 extern int currentInode;
 
 /* mkdir.c functions*/
-extern int getFreeInode(void);
+int getFreeInode(void);
 void updateInodeEntry(int addBytes, int inodeNum, inode_type newNode);
 void mkdirv6(char* dir_name);
-void addNewFileDirectoryEntry(int parentInode, dir_type newDir);
+int addNewFileDirectoryEntry(int parentInode, dir_type newDir);
 void changeDirectoryV6(char* dir_name); 
 int findDirectory(char* dir_name, int parentNode); 
+int fileSystemCheck(void);
+
+inode_type getInode(int inodeNumber); 
+void addFreeBlock(int block); 
+void cpout(char* sourceFile, char* destinationFile); 
+void rm(char* filename); 
+

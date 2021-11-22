@@ -1,5 +1,25 @@
 #include "mod-v6.h"
 
+
+/*
+* Check to see if file system is initialized
+* output: -1: system is not initialized
+*		   1: file is open & system is 
+*/
+int fileSystemCheck(void) {
+
+	if (file_descriptor < 2)  //verify if a file is opened
+	{
+		printf("Error: File is not opened \n");
+		return -1; 
+	}
+	if (superBlock.fsize < 1 || superBlock.isize < 1) {
+		printf("Error: File not initialized\n");
+		return -1;
+	}
+	return 1;
+}
+
 int getFreeInode(void) {
 	int x;
 	int num_inodes = (BLOCK_SIZE / INODE_SIZE) * superBlock.isize;
@@ -22,7 +42,7 @@ int getFreeInode(void) {
 
 void updateInodeEntry(int addBytes, int inodeNum, inode_type newNode) {
 
-	long long   size = ((newNode.size0 << 32) | newNode.size1); //find directory size
+	unsigned long   size = ((newNode.size0 << 32) | newNode.size1); //find directory size
 	int totalBytes = (2 * BLOCK_SIZE) + ((inodeNum - 1) * INODE_SIZE);
 	int writeBytes =  size + addBytes;
 	newNode.size0 = (int)((writeBytes & 0xFFFFFFFF00000000) >> 32); 	// high 64 bit
@@ -56,12 +76,18 @@ void mkdirv6(char* dir_name) {
 	/* Test */
 	dir_type test[16];
 	/* End Test*/
+	//check if file is opened
+	int check = fileSystemCheck();
+	if (check == -1)  //issue with file system
+	{
+		return;
+	}
 
 
 	//check how many folders in filepath
 
 	if (*dir_name != '/') {
-		printf("Incorrect input, must start at root\n");
+		printf("Error: Incorrect input, must start at root\n");
 		return;
 	}
 
@@ -70,12 +96,13 @@ void mkdirv6(char* dir_name) {
 
 	while(folder != NULL){
 		fp = findDirectory(folder, parentInode);
-		if (fp == 0) {
+		if (fp < 0) {
 			newEntry = 1; 
 			break;
 		}
-		else if (fp == -1) {
-			printf("File is not a directory file\n");
+		else if (fp == 0) {
+			printf("Error: File is not a directory file\n");
+			break; 
 		}
 		else {
 			parentInode = fp;
@@ -86,7 +113,7 @@ void mkdirv6(char* dir_name) {
 	}
 
 	if (parentInode > 0 && newEntry == 0) {
-		printf("Directory already created\n");
+		printf("Error: Directory already created\n");
 		return;
 	}
 
@@ -94,13 +121,13 @@ void mkdirv6(char* dir_name) {
 	//check to see if it is a parent directory 
 	freeBlock = getFreeBlock();
 	if (freeBlock == -1) {							// System was full
-		printf("No Free Blocks Available\n");
+		printf("Error: No Free Blocks Available. Directory not created.\n");
 		return;
 	}
 
 	int freeInode = getFreeInode();
 	if (freeInode == -1) {
-		printf("No Inodes available\n");
+		printf("Error: No Inodes available. \n");
 		return;
 	}
 
@@ -128,7 +155,10 @@ void mkdirv6(char* dir_name) {
 
 	/*** go to parent directory to write parent directory entry ***/
 	//find next free inode spot in root directory at parent inode
-	addNewFileDirectoryEntry(v6direc[0].inode, newFile);
+	check = addNewFileDirectoryEntry(v6direc[0].inode, newFile);
+	if (check < 0) {		//error occurred
+		return; 
+	}
 	
 
 	/* Update Inode Struct*/
@@ -156,7 +186,7 @@ void mkdirv6(char* dir_name) {
 }
 
 /*
-* addNewFileDirectoryEntry()
+* Description: Add new file or folder entry to directory
 * Input:
 *	- dir_name = folder/file name
 *	- parentNode = starting Inode
@@ -166,7 +196,7 @@ void mkdirv6(char* dir_name) {
 *
 */
 
-void addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
+int addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 	inode_type parentNode;
 
 	//get file inode struct
@@ -175,12 +205,19 @@ void addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 	read(file_descriptor, &parentNode, INODE_SIZE);
 
 
-	// check to see if inode is a directory file 
-	if ((parentNode.flags & DIREC_FILE) != DIREC_FILE) { //not a directory file
+	int check = findDirectory(newDir.filename, parentInodeNum); 
+	if (check > 0) {
+		printf("Error: File is already in directory\n"); 
 		return -1;
 	}
+	if (check == -1) {
+		printf("Error: Not accessing directory file\n");
+		return -1; 
+	}
+	
+
 	// go to size and see what is size
-	long long   size = ((parentNode.size0 << 32) | parentNode.size1); //find directory size
+	unsigned long   size = ((parentNode.size0 << 32) | parentNode.size1); //find directory size
 
 	// go to addr[] and get blocks
 	int readBlocks[8];
@@ -226,9 +263,10 @@ void addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 		//need to add new block to inode
 		int freeBlock = getFreeBlock();
 		if (freeBlock == -1) {							// System was full
-			printf("No Free Blocks Available\n");
-			return;
+			printf("Error: No Free Blocks Available. Directory not created. \n");
+			return -1;
 		}
+
 		int nextBlock = size / BLOCK_SIZE; 
 
 		if (nextBlock < 7) {
@@ -236,6 +274,8 @@ void addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 			totalBytes = parentNode.addr[freeBlock] * BLOCK_SIZE;
 			lseek(file_descriptor, totalBytes, SEEK_SET);
 			write(file_descriptor, &newDir, DIR_SIZE);
+
+
 			totalBlocks = totalBlocks + 1; 
 
 
@@ -256,8 +296,7 @@ void addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 	// update inode entry
 	updateInodeEntry(DIR_SIZE, parentInodeNum, parentNode);
 
-	
-	return;
+	return 1;
 
 }
 
@@ -270,52 +309,64 @@ void addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 *
 */
 void changeDirectoryV6(char* dir_name) {
-	// search through directory entries and then change current inode to last directory entry value
+    //TODO test
+    int testCurrentInodeBefore = currentInode;
+
+    // search through directory entries and then change current inode to last directory entry value
 
 	int freeBlock;
 	int totalBytes;
 	int writeBytes;
-	int parentInode;
+	int parentInode = 1;
 
 	char* newfile = '/'; 
+
+	//check if file is opened
+	int check = fileSystemCheck();
+	if (check == -1)  //issue with file system
+	{
+		return;
+	}
+
 
 	//check how many folders in filepath
 
 	if (*dir_name != '/') {
-		printf("Incorrect input, must start at root\n");
+		printf("Error: Incorrect input, must start at root\n");
 		return;
 	}
 
 
 	//check if directory is already there
-	currentInode = 1;
 	int fp = 0;
 	char* folder = strtok(dir_name, "/\n");
 	int fileNotFound = 0; //path is not available
 	
 	while (folder != NULL) {
 		
-		fp = findDirectory(folder, currentInode);
+		fp = findDirectory(folder, parentInode);
 		if (fp == 0) {
 			fileNotFound = 1;
 			break;
 		}
 		else if (fp == -1) {
-			printf("File is not a directory file\n");
+			printf("Error: File is not a directory file\n");
 		}
 		else {
-			currentInode = fp;
+			parentInode = fp;
 			folder = strtok(NULL, "/\n");
 
 		}
 
 	}
 
-	if (currentInode > 0 && fileNotFound == 0) {
+	if (parentInode > 0 && fileNotFound == 0) {
 		printf("Directory changed: ");
 		printf("%s\n", dir_name);
 		inode_type curNode;
-		 
+		currentInode = parentInode;		//change current inode to new inode
+
+
 		//find inode for path
 		totalBytes = (2 * BLOCK_SIZE) + INODE_SIZE * (currentInode - 1);	//read inode from block
 		lseek(file_descriptor, totalBytes, SEEK_SET);
@@ -326,9 +377,13 @@ void changeDirectoryV6(char* dir_name) {
 		lseek(file_descriptor, totalBytes, SEEK_SET);
 	}
 	else {
-		printf("Directory not found\n");
+		printf("Error: Directory not found\n");
 	}
-	return; 
+
+    //TODO test
+    int testCurrentInodeAfter = currentInode;
+
+    return;
 	
 }
 
@@ -344,24 +399,27 @@ void changeDirectoryV6(char* dir_name) {
 
 int findDirectory(char* dir_name, int parentNode) {
 
+
 	// find parent folder directory
 	inode_type rootNode;
-	int totalBytes = (2 * BLOCK_SIZE) + (parentNode - 1) * INODE_SIZE;
+	int totalBytes = (2 * BLOCK_SIZE) + ((parentNode - 1) * INODE_SIZE);
 	lseek(file_descriptor, totalBytes, SEEK_SET);
 	read(file_descriptor, &rootNode, INODE_SIZE);
 
 	// check to see if inode is a directory file 
 	if ((rootNode.flags & DIREC_FILE) != DIREC_FILE) { //not a directory file
-		return -1;
+		printf("File is not a directory file\n"); 
+		return 0;
 	}
+
 	// go to size and see what is size
-	long long size = ((rootNode.size0 << 32) | rootNode.size1); //find directory size
+	unsigned long size = ((rootNode.size0 << 32) | rootNode.size1); //find directory size
 
 	// go to addr[]
 	int readBlocks[8];
-	dir_type buffer[DIR_SIZE];
-	int totalBlocks = size / 1024; // total blocks in file
-	int fpFound = 0; // folder Inode 
+	dir_type buffer [DIR_SIZE];
+	int totalBlocks = size / BLOCK_SIZE; // total blocks in file
+	int fpFound = -1; // folder Inode 
 
 	while (totalBlocks > -1) {
 
