@@ -13,10 +13,10 @@ size is 64 Bytes and i-node’s structure and directory entry structure's have b
   
 User can enter the following commands:
 
-(a) initfs n1 n2
+(a) initfs n1 n2  
 where n1 is the file system size in number of blocks and n2 is the number of blocks devoted to
 the i-nodes. Set all the data blocks (except the root directory represented by inode number 1) and 
-the inodes to free. All free blocks are accessible from free[] array of the super block 
+the inodes to free. All free blocks are accessible from free[] array of the super block
 
 (b) openfs file_name
 file_name is the name of the file in the native unix machine (where you are running your program) 
@@ -43,7 +43,7 @@ If v6-file exists, delete the file, free the i-node, remove the file name from t
 Change current (working) directory to the dirname. The directory will be changed if it is present
 in the current working directory.
   
-(h) q
-Save all changes and quit. 
+(h) q  
+Save changes and quit.
 
 When user is done with program, can use "q" command to exit the program.
