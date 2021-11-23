@@ -4,7 +4,7 @@
 * Group 2 - Part 2 contributions: 
 * Jessica Nguyen: getFreeInode, updateInodeEntry, mkdirv6, addNewFileDirectoryEntry, 
 				changeDirectoryV6, findDirectory, fileSystemCheck, & debugging
-* Madhumita Ramesh: getInode, addFreeBlock, cpout, rm 
+* Madhumita Ramesh: getInode, addFreeBlock, cpout, rm, README
 * Micah Steinbrecher: cpin, ls, debugging & integrating modules
 * 
 * How to compile & run: 
@@ -12,19 +12,6 @@
 * 
 *
 */
-
-int getFreeInode(void);
-void updateInodeEntry(int addBytes, int inodeNum, inode_type newNode);
-void mkdirv6(char* dir_name);
-int addNewFileDirectoryEntry(int parentInode, dir_type newDir);
-void changeDirectoryV6(char* dir_name); 
-int findDirectory(char* dir_name, int parentNode); 
-int fileSystemCheck(void);
-
-inode_type getInode(int inodeNumber); 
-void addFreeBlock(int block); 
-void cpout(char* sourceFile, char* destinationFile); 
-void rm(char* filename); 
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -94,26 +81,6 @@ superblock_type superBlock;
 int file_descriptor;
 int currentInode;
 
-void ls(void) {
-	inode_type inode;
-	int offset = (BLOCK_SIZE * 2) + (currentInode - 1) * INODE_SIZE;
-	lseek(file_descriptor, offset, SEEK_SET);
-	read(file_descriptor, &inode, INODE_SIZE);
-	int addr = inode.addr[0];
-	int entries = BLOCK_SIZE / 32;
-	dir_type directory[DIR_SIZE];
-	lseek(file_descriptor, addr * BLOCK_SIZE, SEEK_SET);
-	read(file_descriptor, directory, BLOCK_SIZE);
-
-	int i;
-	for (i = 0; i < entries; i++) {
-		if (directory[i].inode > 0) {
-			printf("%s\n", directory[i].filename);
-		}
-	}
-
-}
-
 void openfs(char* file_name) {
 	file_descriptor = open(file_name, O_RDWR);//open file given
 
@@ -142,7 +109,7 @@ int fileSystemCheck(void) {
 		printf("Error: File is not opened \n");
 		return -1;
 	}
-	if (superBlock.fsize < 1 || superBlock.isize < 1) {
+	if (superBlock.fsize < 1 || superBlock.isize < 1) { // check if file was initialized
 		printf("Error: File not initialized\n");
 		return -1;
 	}
@@ -162,7 +129,7 @@ int getFreeInode(void) {
 		read(file_descriptor, &freeNode, INODE_SIZE);
 
 		if ((freeNode.flags & INODE_ALLOC) == 0) {			//check if inode is free
-			return x;
+			return x;										//return next free inode value
 		}
 	}
 	return -1; // did not find free inode
@@ -185,23 +152,24 @@ int findDirectory(char* dir_name, int parentNode) {
 
 	// go to size and see what is size
 	unsigned long long size = ((rootNode.size0 << 32) | rootNode.size1); //find directory size
+	
 	// go to addr[]
-	int readBlocks[8];
 	dir_type buffer[DIR_SIZE];
 	int totalBlocks = size / BLOCK_SIZE; // total blocks in file
-	int fpFound = 0; // folder Inode
+	int fpFound = 0; // folder Inode value
 
 	while (totalBlocks > -1) {
 		//load block to temp buffer
 		totalBytes = rootNode.addr[totalBlocks] * BLOCK_SIZE;
 		lseek(file_descriptor, totalBytes, SEEK_SET);
 		read(file_descriptor, buffer, BLOCK_SIZE);
+		
 		//read through list to find directory value
 		int i = 0;
 		for (i = 0; i < DIR_SIZE; i++) {
 			if (strcmp(buffer[i].filename, dir_name) == 0) {
 				fpFound = buffer[i].inode;
-				return fpFound;
+				return fpFound;				//return inode if found
 			}
 		}
 		totalBlocks--;
@@ -214,8 +182,8 @@ int findDirectory(char* dir_name, int parentNode) {
 void updateInodeEntry(int addBytes, int inodeNum, inode_type newNode) {
 
 	unsigned long long size = ((newNode.size0 << 32) | newNode.size1); //find directory size
-	int totalBytes = (2 * BLOCK_SIZE) + ((inodeNum - 1) * INODE_SIZE);
-	unsigned long long writeBytes = size + addBytes;
+	int totalBytes = (2 * BLOCK_SIZE) + ((inodeNum - 1) * INODE_SIZE); 
+	unsigned long long writeBytes = size + addBytes;			//get total new bytes of file
 	newNode.size0 = (int)((writeBytes & 0xFFFFFFFF00000000) >> 32); // high 64 bit
 	newNode.size1 = (int)(writeBytes & 0x00000000FFFFFFFF); // low 64 bit
 	newNode.actime = time(NULL);
@@ -248,14 +216,12 @@ int cpin(char* externalFile, char* internalFile) {
 		return -1;
 	}
 
-
-
 	file_size = lseek(source_fd, 0, SEEK_END); // seek to end of file
 	lseek(source_fd, 0, SEEK_SET); // seek back to beginning of file
 
 
 	//get blocks
-	int num_of_blocks = file_size / 1024 + (file_size % 1024 != 0); //??? * QUESTION **
+	int num_of_blocks = file_size / 1024 + (file_size % 1024 != 0);
 	int nfree_reset = superBlock.nfree;
 	int free_reset[251];
 	memcpy(free_reset, superBlock.free, sizeof(free_reset));
@@ -263,13 +229,13 @@ int cpin(char* externalFile, char* internalFile) {
 
 
 	//get data blocks
-	//int blocks[num_of_blocks];
-	int blocks[BLOCK_SIZE];			//uncomment
+	int blocks[num_of_blocks];
 	int i = 0;
 	for (i = 0; i < num_of_blocks; i++) {
 		int free_block = getFreeBlock();
 		if (free_block == -1) {
 			printf("Error: Not enough system memory\n");
+			
 			//reset superblock
 			superBlock.nfree = nfree_reset;
 			memcpy(superBlock.free, free_reset, sizeof(free_reset));
@@ -285,15 +251,14 @@ int cpin(char* externalFile, char* internalFile) {
 	//write to data blocks
 	for (i = 0; i < num_of_blocks; i++) {
 		int bytes = 1024;
-		if (i == num_of_blocks - 1) {
+		if (i == num_of_blocks - 1) {			//last block get the offset
 			bytes = file_size - (i * 1024);
 		}
-		//char buffer[bytes];		//uncomment
-		char buffer[BLOCK_SIZE]; 
+		char buffer[bytes];		
 		offset = blocks[i] * 1024;
 		lseek(file_descriptor, offset, SEEK_SET);
-		read(source_fd, buffer, bytes);
-		write(file_descriptor, buffer, bytes);
+		read(source_fd, buffer, bytes);				//get block from source file
+		write(file_descriptor, buffer, bytes);		// write block to v6 system
 
 	}
 
@@ -391,8 +356,6 @@ void cpout(char* sourceFile, char* destinationFile) {
 	// total size of the current directory
 	inode_size = (node.size0 << 32) | (node.size1);
 
-
-	/** question - this is assuming directory  is continuous blocks **/
 	int inode_blocks = (inode_size / BLOCK_SIZE) + (inode_size % BLOCK_SIZE != 0);
 	int x = 0;
 	dir_type temp[DIR_SIZE];
@@ -420,7 +383,7 @@ void cpout(char* sourceFile, char* destinationFile) {
 				// iterates through every block in the addr and stores the content in buffer
 				lseek(destination, 0, SEEK_SET);
 
-				for (j = 0; j < (fileInode_size / BLOCK_SIZE); j++) {
+				for (j = 0; j < (fileInode_size / BLOCK_SIZE); j++) { 
 
 					block = fileInode.addr[j];
 					lseek(file_descriptor, (block * BLOCK_SIZE), SEEK_SET);
@@ -507,10 +470,11 @@ void rm(char* filename) {
 						// add the block number to the free array
 						addFreeBlock(block);
 					}
-					inode_type file_inode = getInode(directory[i].inode);
+					inode_type file_inode = getInode(directory[i].inode);  //get inode of file 
 					int file_inode_number = directory[i].inode;
+					
 					directory[i].inode = 0;                // this directory entry no longer exists so making inode 0
-					//strcpy(directory[i].filename, "");
+					strcpy(directory[i].filename, "");		// remove file entry 
 
 
 					file_inode.flags = INODE_FREE;
@@ -521,11 +485,12 @@ void rm(char* filename) {
 
 					currentDirectoryInode.size0 = (int)((directory_size & 0xFFFFFFFF00000000) >> 32);        // high 64 bit
 					currentDirectoryInode.size1 = (int)(directory_size & 0x00000000FFFFFFFF);                 // low 64 bit
-				   // writing the updated directory into the block at it's correct position
+				  
+				  // writing the updated directory into the block at it's correct position
 					lseek(file_descriptor, (BLOCK_SIZE * currentDirectoryInode.addr[x]), SEEK_SET);
 					write(file_descriptor, directory, BLOCK_SIZE);
 
-					// writing the updated inode into the block at it's correct position
+					// writing the updated file inode into the block at it's correct position
 					int inode_block = (file_inode_number * INODE_SIZE) / BLOCK_SIZE;
 					int offset = ((file_inode_number - 1) * INODE_SIZE) % BLOCK_SIZE;
 					lseek(file_descriptor, (inode_block * BLOCK_SIZE) + offset, SEEK_SET);
@@ -554,7 +519,7 @@ int addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 	lseek(file_descriptor, totalBytes, SEEK_SET);
 	read(file_descriptor, &parentNode, INODE_SIZE);
 
-	int check = findDirectory(newDir.filename, parentInodeNum);
+	int check = findDirectory(newDir.filename, parentInodeNum); 	//check if file is in directory
 	if (check > 0) {
 		printf("Error: File is already in directory\n");
 		return -1;
@@ -569,12 +534,11 @@ int addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 	unsigned long long size = ((parentNode.size0 << 32) | parentNode.size1); //find directory size
 
 	// go to addr[] and get blocks
-	int readBlocks[8];
 	dir_type buffer[DIR_SIZE];
 	//char buffer[1024];
 	int totalBlocks = size / BLOCK_SIZE; // total blocks in file
-	int dirNum = -1;
-	int writeflag = 0;
+	int dirNum = -1;		
+	int writeflag = 0;		//flag - file entry added
 	while (totalBlocks > -1 && writeflag == 0) {
 
 		//load block to temp buffer
@@ -585,13 +549,13 @@ int addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 		// search through inodes to find directory value
 		int i = 0;
 		for (i = 0; i < DIR_SIZE; i++) {
-			if (buffer[i].inode == 0) {
-				dirNum = i;
+			if (buffer[i].inode == 0) {			//find empty directory location and put in new entry
+				dirNum = i;					//location in directory
 
 				totalBytes = (parentNode.addr[totalBlocks] * BLOCK_SIZE) + (dirNum * DIR_SIZE);
 				lseek(file_descriptor, totalBytes, SEEK_SET);
 				write(file_descriptor, &newDir, DIR_SIZE);
-				writeflag = 1;
+				writeflag = 1;			
 				break;
 			}
 		}
@@ -610,8 +574,8 @@ int addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 			printf("Error: No Free Blocks Available. Directory not created. \n");
 			return -1;
 		}
-		int nextBlock = size / BLOCK_SIZE;
-		if (nextBlock < 7) {
+		int nextBlock = size / BLOCK_SIZE;				//find how many blocks to write to 
+		if (nextBlock < 7) {							// for small file
 			parentNode.addr[nextBlock + 1] = freeBlock;
 			totalBytes = parentNode.addr[freeBlock] * BLOCK_SIZE;
 			lseek(file_descriptor, totalBytes, SEEK_SET);
@@ -632,7 +596,7 @@ int addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 	// update inode entry
 	updateInodeEntry(DIR_SIZE, parentInodeNum, parentNode);
 
-	return 1;
+	return 1;			//update success
 
 }
 
@@ -670,18 +634,18 @@ void mkdirv6(char* dir_name) {
 
 	char* fullfilename = strtok(dir_name, "\n");
 
-	if ((strcmp(fullfilename, root)) == 0) {
+	if ((strcmp(fullfilename, root)) == 0) { 	//check for root node
 		strcat(directoryPath, root);
 		parentInode = 1;
 	}
 	else {
-		char* folder = strtok(dir_name, "/\n");
+		char* folder = strtok(dir_name, "/\n"); //go through file path and find new location
 		while (folder != NULL) {
 			strcat(directoryPath, root);
 			fp = findDirectory(folder, parentInode);
 			if (fp == 0) {
 				newEntry = 1;
-				strcat(directoryPath, folder);
+				strcat(directoryPath, folder);  //add file to pathname
 				newFolder = folder;
 				break;
 			}
@@ -690,43 +654,45 @@ void mkdirv6(char* dir_name) {
 				break;
 			}
 			else {
-				parentInode = fp;
-				strcat(directoryPath, folder);
+				parentInode = fp;				//update parent inode value
+				strcat(directoryPath, folder);  //add file to pathname
 				folder = strtok(NULL, "/\n");
 
 			}
 		}
 	}
 
-	if (parentInode > 0 && newEntry == 0) {
+	if (parentInode > 0 && newEntry == 0) {		//entry already created
 		printf("Error: Directory already created\n");
 		return;
 	}
-
+	/*** only if new directory entry **/
 	//if not there, make a new directory entry
-	//check to see if it is a parent directory
-	freeBlock = getFreeBlock();
+	freeBlock = getFreeBlock();  //get a new free block
 	if (freeBlock == -1) {// System was full
 		printf("Error: No Free Blocks Available. Directory not created.\n");
 		return;
 	}
 
-	int freeInode = getFreeInode();
+	int freeInode = getFreeInode();  // get new inode
 	if (freeInode == -1) {
 		printf("Error: No Inodes available. \n");
 		return;
 	}
 
+	//directory entry 
 	newFile.inode = freeInode;
 	strcpy(newFile.filename, newFolder);
-	/*** only if new directory entry **/
+
 	//find the parent inode if it is not the parent directory
 	v6direc[0].inode = parentInode;//root directory
 	strcpy(v6direc[0].filename, ".");
+	
 	v6direc[1].inode = 1;//root directory
 	strcpy(v6direc[1].filename, "..");
+	
 	int i;
-	for (i = 2; i < 16; i++) {//set rest of nodes to free
+	for (i = 2; i < 16; i++) {//set rest of directory to free
 		v6direc[i].inode = 0;
 	}
 
@@ -751,6 +717,7 @@ void mkdirv6(char* dir_name) {
 	v6dir.addr[0] = freeBlock;
 	v6dir.actime = time(NULL);
 	v6dir.modtime = time(NULL);
+	
 	// directory size
 	writeBytes = DIR_SIZE * 2;
 	v6dir.size0 = (int)((writeBytes & 0xFFFFFFFF00000000) >> 32); // high 32 bit
@@ -766,10 +733,7 @@ void mkdirv6(char* dir_name) {
 void changeDirectoryV6(char* dir_name) {
 	// search through directory entries and then change current inode to last directory entry value
 
-	int freeBlock;
-	int totalBytes;
-	int writeBytes;
-	int parentInode = 1;
+	int parentInode = 1; 		//start from root directory
 	char filename[100] = { 0 };
 
 	char* root = "/";
@@ -791,14 +755,14 @@ void changeDirectoryV6(char* dir_name) {
 	//check if directory is already there
 	int fp = 0;
 	char* fullfilename = strtok(dir_name, "\n");
-	int fileNotFound = 0; //path is not available
+	int fileNotFound = 0; //flag - path is not available
 
-	if ((strcmp(fullfilename, root)) == 0) {
+	if ((strcmp(fullfilename, root)) == 0) {  //change to root directory
 		strcat(filename, root);
 		parentInode = 1;
 	}
 	else {
-		char* folder = strtok(dir_name, "/\n");
+		char* folder = strtok(dir_name, "/\n");  //find other directory
 		while (folder != NULL) {
 			strcat(filename, root);
 			fp = findDirectory(folder, parentInode);
@@ -810,7 +774,7 @@ void changeDirectoryV6(char* dir_name) {
 				printf("Error: File is not a directory file\n");
 			}
 			else {
-				parentInode = fp;
+				parentInode = fp;			//go to next path value
 				strcat(filename, folder);
 				folder = strtok(NULL, "/\n");
 
@@ -1180,9 +1144,6 @@ void modv6cmds(char* command) {
 		else if ((strcmp(args[0], "cd") == 0)) {
 			args[1] = strtok(NULL, "");// # nodes for i-nodes
 			changeDirectoryV6(args[1]);
-		}
-		else if ((strcmp(args[0], "ls\n") == 0)) {
-			ls();
 		}
 		else {
 			printf("Invalid Command\n");
