@@ -3,9 +3,10 @@ V6 file system is highly restrictive. A modification has been done: Block size i
 size is 64 Bytes and i-node’s structure and directory entry structure's have been modified as well.
 
 # How to compile:
-1. Open SSH connection to csgrads1.utdallas.edu UTD linux server
-2. Copy/Load mod-v6.c file to server directory
-3. Compile using the following command in the terminal: "gcc mod-v6.c -o modv6"
+1. Unzip the given "project2-part2" zip file, which contains a ReadMe file and a C file named "mod-v6"
+2. Open SSH connection to csgrads1.utdallas.edu UTD linux server
+3. Copy/Load mod-v6.c file to server directory
+4. Compile using the following command in the terminal: "gcc mod-v6.c -o modv6"
 
 # How to run the program:
 1. In terminal, enter the following command to start the program: "./modv6"
