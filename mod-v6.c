@@ -1,15 +1,15 @@
 /* Project 2 - Part 2
 *  November 24, 2021
-* 
-* Group 2 - Part 2 contributions: 
-* Jessica Nguyen: getFreeInode, updateInodeEntry, mkdirv6, addNewFileDirectoryEntry, 
+*
+* Group 2 - Part 2 contributions:
+* Jessica Nguyen: getFreeInode, updateInodeEntry, mkdirv6, addNewFileDirectoryEntry,
 				changeDirectoryV6, findDirectory, fileSystemCheck, & debugging
 * Madhumita Ramesh: getInode, addFreeBlock, cpout, rm, README
-* Micah Steinbrecher: cpin, ls, debugging & integrating modules
-* 
-* How to compile & run: 
-* See README.md 
-* 
+* Micah Steinbrecher: cpin, rm, debugging & integrating modules
+*
+* How to compile & run:
+* See README.md
+*
 *
 */
 
@@ -80,6 +80,7 @@ typedef struct {
 superblock_type superBlock;
 int file_descriptor;
 int currentInode;
+char currentFilepath[200]; 
 
 void openfs(char* file_name) {
 	file_descriptor = open(file_name, O_RDWR);//open file given
@@ -146,13 +147,13 @@ int findDirectory(char* dir_name, int parentNode) {
 
 	// check to see if inode is a directory file
 	if ((rootNode.flags & DIREC_FILE) != DIREC_FILE) { //not a directory file
-		printf("File is not a directory file\n");
+		printf("Error: File is not a directory file\n");
 		return -1;
 	}
 
 	// go to size and see what is size
 	unsigned long long size = ((rootNode.size0 << 32) | rootNode.size1); //find directory size
-	
+
 	// go to addr[]
 	dir_type buffer[DIR_SIZE];
 	int totalBlocks = size / BLOCK_SIZE; // total blocks in file
@@ -163,7 +164,7 @@ int findDirectory(char* dir_name, int parentNode) {
 		totalBytes = rootNode.addr[totalBlocks] * BLOCK_SIZE;
 		lseek(file_descriptor, totalBytes, SEEK_SET);
 		read(file_descriptor, buffer, BLOCK_SIZE);
-		
+
 		//read through list to find directory value
 		int i = 0;
 		for (i = 0; i < DIR_SIZE; i++) {
@@ -182,7 +183,7 @@ int findDirectory(char* dir_name, int parentNode) {
 void updateInodeEntry(int addBytes, int inodeNum, inode_type newNode) {
 
 	unsigned long long size = ((newNode.size0 << 32) | newNode.size1); //find directory size
-	int totalBytes = (2 * BLOCK_SIZE) + ((inodeNum - 1) * INODE_SIZE); 
+	int totalBytes = (2 * BLOCK_SIZE) + ((inodeNum - 1) * INODE_SIZE);
 	unsigned long long writeBytes = size + addBytes;			//get total new bytes of file
 	newNode.size0 = (int)((writeBytes & 0xFFFFFFFF00000000) >> 32); // high 64 bit
 	newNode.size1 = (int)(writeBytes & 0x00000000FFFFFFFF); // low 64 bit
@@ -229,13 +230,13 @@ int cpin(char* externalFile, char* internalFile) {
 
 
 	//get data blocks
-	int blocks[num_of_blocks];
+	int blocks[num_of_blocks]; 
 	int i = 0;
 	for (i = 0; i < num_of_blocks; i++) {
 		int free_block = getFreeBlock();
 		if (free_block == -1) {
 			printf("Error: Not enough system memory\n");
-			
+
 			//reset superblock
 			superBlock.nfree = nfree_reset;
 			memcpy(superBlock.free, free_reset, sizeof(free_reset));
@@ -254,7 +255,7 @@ int cpin(char* externalFile, char* internalFile) {
 		if (i == num_of_blocks - 1) {			//last block get the offset
 			bytes = file_size - (i * 1024);
 		}
-		char buffer[bytes];		
+		char buffer[bytes];		 
 		offset = blocks[i] * 1024;
 		lseek(file_descriptor, offset, SEEK_SET);
 		read(source_fd, buffer, bytes);				//get block from source file
@@ -346,7 +347,7 @@ void cpout(char* sourceFile, char* destinationFile) {
 	//check if source file is in directory
 	check = findDirectory(sourceFile, currentInode);
 	if (check == 0) {
-		printf("File is not in directory\n");
+		printf("Error: File is not in directory\n");
 		return;
 	}
 
@@ -358,6 +359,7 @@ void cpout(char* sourceFile, char* destinationFile) {
 
 	int inode_blocks = (inode_size / BLOCK_SIZE) + (inode_size % BLOCK_SIZE != 0);
 	int x = 0;
+	int writeFlag = 0;		// flag - file written to system
 	dir_type temp[DIR_SIZE];
 	for (i = 0; i < inode_blocks; i++) {
 		block = node.addr[i];                                       // returns the first block stored in the addr of the inode
@@ -368,7 +370,6 @@ void cpout(char* sourceFile, char* destinationFile) {
 			x++;
 		}
 	}
-
 	// checks through each directory entry
 	for (i = 0; i < (inode_size / DIR_SIZE); i++) {
 
@@ -383,7 +384,7 @@ void cpout(char* sourceFile, char* destinationFile) {
 				// iterates through every block in the addr and stores the content in buffer
 				lseek(destination, 0, SEEK_SET);
 
-				for (j = 0; j < (fileInode_size / BLOCK_SIZE); j++) { 
+				for (j = 0; j < (fileInode_size / BLOCK_SIZE); j++) {
 
 					block = fileInode.addr[j];
 					lseek(file_descriptor, (block * BLOCK_SIZE), SEEK_SET);
@@ -405,15 +406,22 @@ void cpout(char* sourceFile, char* destinationFile) {
 				int totalBytes = (2 * BLOCK_SIZE) + (INODE_SIZE * (currentInode - 1));
 				lseek(file_descriptor, totalBytes, SEEK_SET);
 				read(file_descriptor, node, INODE_SIZE);
-
+				writeFlag = 1;						//file written to system
 				printf("File written to system\n");
 			}
 			else {                                               // if the inode is unallocated, there is no file present
 				printf("Error: File not found\n");
+				return;
 			}
-			return;
+			
 		}
+		}
+	if (writeFlag == 0) {
+		printf("Error: File Transfer Failed\n");
+		return;
 	}
+
+
 }
 
 void rm(char* filename) {
@@ -436,6 +444,7 @@ void rm(char* filename) {
 	int inode_blocks = (directory_size / BLOCK_SIZE) + (directory_size % BLOCK_SIZE != 0);
 	int x = 0;
 	dir_type temp[DIR_SIZE];
+	int removeFlag = 0; // file has been removed
 	for (x = 0; x < inode_blocks; x++) {
 		int block = currentDirectoryInode.addr[x];                                       // returns the first block stored in the addr of the inode
 		lseek(file_descriptor, (block * BLOCK_SIZE), SEEK_SET);      // finding the address of the block of the inode
@@ -446,14 +455,12 @@ void rm(char* filename) {
 		for (i = 0; i < DIR_SIZE; i++) {
 
 
-			if ((strcmp(filename, directory[i].filename) == 0) &&
-				(directory[i].inode > 0)) {      // if the file to be deleted has been found
+			if ((strcmp(filename, directory[i].filename) == 0) && (directory[i].inode > 0)) {      // if the file to be deleted has been found
 
 				inode_type fileInode = getInode(directory[i].inode);
 				unsigned int* fileBlocks = fileInode.addr;          // storing the block numbers of the inode of the filename to be copied
 
-				if (fileInode.flags ==
-					(INODE_ALLOC | PLAIN_FILE)) {                     // if the inode is allocated & regular file
+				if (fileInode.flags ==	(INODE_ALLOC | PLAIN_FILE)) {                     // if the inode is allocated & regular file
 				   // calculates the size of file
 					unsigned long long fileInode_size = (fileInode.size0 << 32) | (fileInode.size1);
 
@@ -472,7 +479,7 @@ void rm(char* filename) {
 					}
 					inode_type file_inode = getInode(directory[i].inode);  //get inode of file 
 					int file_inode_number = directory[i].inode;
-					
+
 					directory[i].inode = 0;                // this directory entry no longer exists so making inode 0
 					strcpy(directory[i].filename, "");		// remove file entry 
 
@@ -485,7 +492,7 @@ void rm(char* filename) {
 
 					currentDirectoryInode.size0 = (int)((directory_size & 0xFFFFFFFF00000000) >> 32);        // high 64 bit
 					currentDirectoryInode.size1 = (int)(directory_size & 0x00000000FFFFFFFF);                 // low 64 bit
-				  
+
 				  // writing the updated directory into the block at it's correct position
 					lseek(file_descriptor, (BLOCK_SIZE * currentDirectoryInode.addr[x]), SEEK_SET);
 					write(file_descriptor, directory, BLOCK_SIZE);
@@ -495,6 +502,8 @@ void rm(char* filename) {
 					int offset = ((file_inode_number - 1) * INODE_SIZE) % BLOCK_SIZE;
 					lseek(file_descriptor, (inode_block * BLOCK_SIZE) + offset, SEEK_SET);
 					write(file_descriptor, &file_inode, INODE_SIZE);
+					removeFlag = 1; 
+					printf("File removed\n"); 
 					return;
 				}
 				else {
@@ -506,6 +515,11 @@ void rm(char* filename) {
 
 		}
 
+	}
+
+	if (removeFlag == 0) {
+		printf("Error: File not found\n");
+		return;
 	}
 
 }
@@ -535,9 +549,8 @@ int addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 
 	// go to addr[] and get blocks
 	dir_type buffer[DIR_SIZE];
-	//char buffer[1024];
 	int totalBlocks = size / BLOCK_SIZE; // total blocks in file
-	int dirNum = -1;		
+	int dirNum = -1;
 	int writeflag = 0;		//flag - file entry added
 	while (totalBlocks > -1 && writeflag == 0) {
 
@@ -554,8 +567,8 @@ int addNewFileDirectoryEntry(int parentInodeNum, dir_type newDir) {
 
 				totalBytes = (parentNode.addr[totalBlocks] * BLOCK_SIZE) + (dirNum * DIR_SIZE);
 				lseek(file_descriptor, totalBytes, SEEK_SET);
-				write(file_descriptor, &newDir, DIR_SIZE);
-				writeflag = 1;			
+				write(file_descriptor, &newDir, DIR_SIZE);	
+				writeflag = 1;
 				break;
 			}
 		}
@@ -608,7 +621,7 @@ void mkdirv6(char* dir_name) {
 	int freeBlock;
 	int totalBytes;
 	int writeBytes;
-	int parentInode = 1;//start from root node
+	int parentInode = currentInode;//start from current Inode
 	char* root = "/";
 	char directoryPath[100] = { 0 };
 	char* newFolder;
@@ -623,10 +636,10 @@ void mkdirv6(char* dir_name) {
 	}
 
 
-	//check how many folders in filepath
+	//check to see if started with absolute path
 
 	if (*dir_name != '/') {
-		printf("Error: Incorrect input, must start at root\n");
+		printf("Error: Incorrect input, must be a folder\n");
 		return;
 	}
 
@@ -635,37 +648,45 @@ void mkdirv6(char* dir_name) {
 	char* fullfilename = strtok(dir_name, "\n");
 
 	if ((strcmp(fullfilename, root)) == 0) { 	//check for root node
-		strcat(directoryPath, root);
-		parentInode = 1;
+		printf("No folder created\n");
+		return;
 	}
-	else {
-		char* folder = strtok(dir_name, "/\n"); //go through file path and find new location
-		while (folder != NULL) {
-			strcat(directoryPath, root);
-			fp = findDirectory(folder, parentInode);
-			if (fp == 0) {
-				newEntry = 1;
-				strcat(directoryPath, folder);  //add file to pathname
-				newFolder = folder;
-				break;
-			}
-			else if (fp == -1) {
-				printf("Error: File is not a directory file\n");
-				break;
+
+	
+	char* folder = strtok(dir_name, "/\n"); //go through file path and find new location
+	while (folder != NULL) {
+		strcat(directoryPath, root);
+		fp = findDirectory(folder, parentInode);
+		if (fp == 0) {
+			newEntry = 1;
+			strcat(directoryPath, folder);  //add file to pathname
+			newFolder = folder;
+			folder = strtok(NULL, "/\n");
+			if (folder != NULL) {
+				printf("Error: Parent Folder Does Not Exist\n"); 
+				return; 
 			}
 			else {
-				parentInode = fp;				//update parent inode value
-				strcat(directoryPath, folder);  //add file to pathname
-				folder = strtok(NULL, "/\n");
-
+				break;
 			}
 		}
-	}
+		else if (fp == -1) {
+			printf("Error: File is not a directory file\n");
+			break;
+		}
+		else {
+			parentInode = fp;				//update parent inode value
+			strcat(directoryPath, folder);  //add file to pathname
+			folder = strtok(NULL, "/\n");
 
+		}
+	}
+	
 	if (parentInode > 0 && newEntry == 0) {		//entry already created
 		printf("Error: Directory already created\n");
 		return;
 	}
+
 	/*** only if new directory entry **/
 	//if not there, make a new directory entry
 	freeBlock = getFreeBlock();  //get a new free block
@@ -680,35 +701,24 @@ void mkdirv6(char* dir_name) {
 		return;
 	}
 
-	//directory entry 
-	newFile.inode = freeInode;
-	strcpy(newFile.filename, newFolder);
-
-	//find the parent inode if it is not the parent directory
-	v6direc[0].inode = parentInode;//root directory
+	//write new folder entry directory file
+	v6direc[0].inode = parentInode;  //parent directory
 	strcpy(v6direc[0].filename, ".");
-	
+
 	v6direc[1].inode = 1;//root directory
 	strcpy(v6direc[1].filename, "..");
-	
+
 	int i;
 	for (i = 2; i < 16; i++) {//set rest of directory to free
 		v6direc[i].inode = 0;
 	}
 
-	//write directory to data block
+	//write directory file to data block
 	totalBytes = (freeBlock * BLOCK_SIZE);
 	lseek(file_descriptor, totalBytes, SEEK_SET);
 	write(file_descriptor, v6direc, BLOCK_SIZE);
-	
-	/*** go to parent directory to write parent directory entry ***/
-	//find next free inode spot in root directory at parent inode
-	check = addNewFileDirectoryEntry(v6direc[0].inode, newFile);
-	if (check < 0) {//error occurred
-		return;
-	}
 
-	/* Update Inode Struct*/
+	/* Update Inode Block with new Inode*/
 	// inode struct
 	v6dir.flags = (INODE_ALLOC | DIREC_FILE); // I-node allocated + directory file
 	v6dir.nlinks = 1;
@@ -717,14 +727,26 @@ void mkdirv6(char* dir_name) {
 	v6dir.addr[0] = freeBlock;
 	v6dir.actime = time(NULL);
 	v6dir.modtime = time(NULL);
-	
+
 	// directory size
 	writeBytes = DIR_SIZE * 2;
 	v6dir.size0 = (int)((writeBytes & 0xFFFFFFFF00000000) >> 32); // high 32 bit
 	v6dir.size1 = (int)(writeBytes & 0x00000000FFFFFFFF); // low 32 bit
 
-	//write inode to inode block
+	//Create new inode entry
 	updateInodeEntry(0, freeInode, v6dir);
+
+	/* go to parent directory to write parent directory entry */
+	//directory entry 
+	newFile.inode = freeInode;
+	strcpy(newFile.filename, newFolder);
+
+	//find next free inode spot in root directory at parent inode
+	check = addNewFileDirectoryEntry(parentInode, newFile);
+	if (check < 0) {//error occurred
+		return;
+	}
+
 	printf("Directory Created: %s\n", directoryPath);
 	return;
 }
@@ -733,10 +755,16 @@ void mkdirv6(char* dir_name) {
 void changeDirectoryV6(char* dir_name) {
 	// search through directory entries and then change current inode to last directory entry value
 
-	int parentInode = 1; 		//start from root directory
+	int parentInode = currentInode; 		//start from root directory
 	char filename[100] = { 0 };
 
 	char* root = "/";
+	char* parentFolder = "."; 
+	char* rootFolder = ".."; 
+
+	char* childFolder;
+	int filelen = 0;
+	int pathlen = 0;
 
 	//check if file is opened
 	int check = fileSystemCheck();
@@ -745,48 +773,94 @@ void changeDirectoryV6(char* dir_name) {
 		return;
 	}
 
-	//check how many folders in filepath
 
-	if (*dir_name != '/') {
-		printf("Error: Incorrect input, must start at root\n");
-		return;
-	}
-
-	//check if directory is already there
+	//check if directory is  there
 	int fp = 0;
 	char* fullfilename = strtok(dir_name, "\n");
 	int fileNotFound = 0; //flag - path is not available
 
-	if ((strcmp(fullfilename, root)) == 0) {  //change to root directory
-		strcat(filename, root);
-		parentInode = 1;
+	if ((strcmp(fullfilename, root)) == 0) {  //check current folder
+		printf("Error: No Folder Specified\n"); 
+		parentInode = currentInode;
 	}
 	else {
 		char* folder = strtok(dir_name, "/\n");  //find other directory
-		while (folder != NULL) {
-			strcat(filename, root);
+		if (strcmp(folder, parentFolder) == 0) {	// go back to parent folder
 			fp = findDirectory(folder, parentInode);
-			if (fp == 0) {
-				fileNotFound = 1;
-				break;
-			}
-			else if (fp == -1) {
-				printf("Error: File is not a directory file\n");
-			}
-			else {
-				parentInode = fp;			//go to next path value
-				strcat(filename, folder);
-				folder = strtok(NULL, "/\n");
+			parentInode = fp; 
+			childFolder = strrchr(currentFilepath, '/'); //remove last folder from filepath
+			filelen = strlen(childFolder);
+			pathlen = strlen(currentFilepath); 
+			pathlen = pathlen - filelen; 
+			memcpy(filename, currentFilepath, pathlen);	 //new path name
 
+		}
+		else if ((strcmp(folder, rootFolder) == 0)) { //go to root
+			fp = findDirectory(folder, parentInode);
+			parentInode = fp;
+			
+		}
+		else {									//find next directory folder 
+			if ((*dir_name != '/')) {			//check to see if started with absolute path
+				printf("Error: Incorrect input, must be a folder\n");
+				return;
 			}
 
+			while (folder != NULL) {		
+				strcat(filename, root);
+				fp = findDirectory(folder, parentInode);
+				
+				if (fp == 0) {					//folder not in directory
+					fileNotFound = 1;
+					break;
+				}
+				else if (fp == -1) {			//file is another type of file
+					printf("Error: File is not a directory file\n");
+				}
+				else {
+					parentInode = fp;			//go to next path value
+					strcat(filename, folder);
+					folder = strtok(NULL, "/\n");
+
+				}
+			}
 		}
 	}
 
+	
 
 	if (parentInode > 0 && fileNotFound == 0) {
-		printf("Directory changed: ");
-		printf("%s\n", filename);
+
+		inode_type newNode;
+		int totalBytes = (2 * BLOCK_SIZE) + ((parentInode - 1) * INODE_SIZE);
+		lseek(file_descriptor, totalBytes, SEEK_SET);
+		read(file_descriptor, &newNode, INODE_SIZE);
+
+		// check to see if inode is a directory file
+		if ((newNode.flags & DIREC_FILE) != DIREC_FILE) { //not a directory file
+			printf("Error: File is not a directory file\n");
+			return;
+		}
+
+		printf("Current Directory: ");
+		if (parentInode == 1) {						//specify root folder
+			strcpy(currentFilepath, root); 
+		}
+		else if(filelen>0){							//specify new file path
+			strcpy(currentFilepath, filename); 
+		}
+		else {
+			pathlen = strlen(currentFilepath);  //add new folders to filepath
+			if (pathlen == 1) {
+				strcpy(currentFilepath, filename);  //file start from root
+			}
+			else {
+				strcat(currentFilepath, filename); 
+			}
+			
+			
+		}
+		printf("%s\n", currentFilepath);
 		currentInode = parentInode;//change current inode to new inode
 	}
 	else {
@@ -955,7 +1029,7 @@ void createRootDirectory(void) {
 	int i;
 	freeBlock = getFreeBlock();
 	if (freeBlock == -1) {// System was full
-		printf("No Free Blocks Available\n");
+		printf("Error: No Free Blocks Available\n");
 		return;
 	}
 
@@ -1120,6 +1194,10 @@ void modv6cmds(char* command) {
 		else if ((strcmp(args[0], "cpin") == 0)) {
 			args[1] = strtok(NULL, " ");// system external file
 			args[2] = strtok(NULL, "\n");// file system v6 file
+			if (args[2] == NULL || args[1] == NULL) {
+				printf("Invalid Command\n");
+			}
+			else {
 			int check = cpin(args[1], args[2]);
 			if (check > 0) {
 				printf("File transfer success\n");
@@ -1127,23 +1205,48 @@ void modv6cmds(char* command) {
 			else {
 				printf("File transfer failed\n");
 			}
+		 }
 		}
 		else if ((strcmp(args[0], "cpout") == 0)) {
 			args[1] = strtok(NULL, " ");// system external file
 			args[2] = strtok(NULL, "\n");// file system v6 file
-			cpout(args[1], args[2]);
+			
+			if (args[2] == NULL || args[1] == NULL) {
+				printf("Invalid Command\n"); 
+			}
+			else {
+				cpout(args[1], args[2]);
+			}
+			
 		}
 		else if ((strcmp(args[0], "rm") == 0)) {
 			args[1] = strtok(NULL, "\n");// file system v6 file
-			rm(args[1]);
+			if (args[1] == NULL) {
+				printf("Invalid Command\n");
+			}
+			else {
+				rm(args[1]);
+			}
 		}
 		else if ((strcmp(args[0], "mkdir") == 0)) {
 			args[1] = strtok(NULL, "");// file system v6 directory
-			mkdirv6(args[1]);
+			char* enter = "\n";
+			if (args[1] == NULL || (strcmp(args[1], enter) == 0)) {
+				printf("Invalid Command\n");
+			}
+			else {
+				mkdirv6(args[1]);
+			}
 		}
 		else if ((strcmp(args[0], "cd") == 0)) {
 			args[1] = strtok(NULL, "");// # nodes for i-nodes
-			changeDirectoryV6(args[1]);
+			char* enter = "\n"; 
+			if (args[1] == NULL || (strcmp(args[1], enter)==0)) {
+				printf("Invalid Command\n");
+			}
+			else {
+				changeDirectoryV6(args[1]);
+			}
 		}
 		else {
 			printf("Invalid Command\n");
