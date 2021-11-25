@@ -32,9 +32,15 @@ If the v6-file exists, create externalfile and make the externalfile's contents 
   
 (e) mkdir v6-dir  
 If v6-dir does not exist, create the directory and set its first two entries . and ..  
-To create a directory, the whole filepath has to be mentioned, starting from the root,
-to specify the correct location of the directory created.
+Directory will only be created one folder at a time. 
+For example: mkdir /user/Venky will not be created unless /user already exists
+
+Directories will start from the root unless changed current directory location.  
 For example: mkdir /user/Venky will create directory /Venky inside /user
+
+If directory location changed, new directory will be made from current opened directory location. 
+For example: cd /user
+             mkdir /Venky will create the file path: /user/Venky
   
 (f) rm v6-file  
 If v6-file exists, delete the file, free the i-node, remove the file name from the  
